@@ -33,6 +33,7 @@ class PortfolioStateBuilder:
         kafka_brokers: str,
         group_id: str = "risk-engine-portfolio-builder",
         on_fill: Callable[[dict], None] | None = None,
+        on_order_complete: Callable[[dict], None] | None = None,
     ) -> None:
         self.portfolio = portfolio
         self.consumer_config: dict = {
@@ -45,6 +46,8 @@ class PortfolioStateBuilder:
         self._running = False
         self._thread: threading.Thread | None = None
         self._on_fill = on_fill
+        self._on_order_complete = on_order_complete
+        self._order_fills: dict[str, list[dict]] = {}  # order_id -> list of fills
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -118,7 +121,17 @@ class PortfolioStateBuilder:
                 self._handle_fill(event, log)
             elif event_type == "order_created":
                 log.info("order_tracked", order_id=event.get("order_id"))
-            elif event_type in ("order_canceled", "order_rejected"):
+            elif event_type == "order_filled":
+                order_id = event.get("order_id", "")
+                log.info("order_terminal", order_id=order_id, status=event_type)
+                self._trigger_order_complete(order_id, event, log)
+            elif event_type == "order_canceled":
+                order_id = event.get("order_id", "")
+                log.info("order_terminal", order_id=order_id, status=event_type)
+                # Only trigger if there were partial fills
+                if order_id and order_id in self._order_fills:
+                    self._trigger_order_complete(order_id, event, log)
+            elif event_type == "order_rejected":
                 log.info(
                     "order_terminal",
                     order_id=event.get("order_id"),
@@ -225,6 +238,13 @@ class PortfolioStateBuilder:
             price=str(price),
         )
 
+        # Track fills by order_id for execution report aggregation
+        order_id = event.get("order_id", "")
+        if order_id:
+            if order_id not in self._order_fills:
+                self._order_fills[order_id] = []
+            self._order_fills[order_id].append(fill)
+
         # Notify fill callback (e.g. settlement tracker)
         if self._on_fill:
             try:
@@ -239,6 +259,24 @@ class PortfolioStateBuilder:
                 })
             except Exception as exc:  # noqa: BLE001
                 log.error("on_fill_callback_failed", error=str(exc))
+
+    # ------------------------------------------------------------------
+    # Execution report trigger
+    # ------------------------------------------------------------------
+
+    def _trigger_order_complete(self, order_id: str, event: dict, log) -> None:  # noqa: ANN001
+        """Invoke the on_order_complete callback with aggregated fill data."""
+        if not self._on_order_complete:
+            return
+        fills = self._order_fills.pop(order_id, [])
+        try:
+            self._on_order_complete({
+                "order_id": order_id,
+                "fills": fills,
+                "event": event,
+            })
+        except Exception as exc:  # noqa: BLE001
+            log.error("on_order_complete_callback_failed", error=str(exc))
 
 
 # ======================================================================
