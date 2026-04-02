@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type {
+  ConcentrationResult,
+  PortfolioGreeks,
   VaRMetrics,
   DrawdownData,
   SettlementTimeline,
@@ -9,6 +11,8 @@ import {
   fetchVaR as apiFetchVaR,
   fetchDrawdown as apiFetchDrawdown,
   fetchSettlement as apiFetchSettlement,
+  fetchGreeks as apiFetchGreeks,
+  fetchConcentration as apiFetchConcentration,
 } from "../api/rest";
 import { createRiskStream } from "../api/ws";
 import type ReconnectingWebSocket from "reconnecting-websocket";
@@ -22,6 +26,12 @@ export interface RiskStoreState {
 
   /** Current settlement timeline */
   settlement: SettlementTimeline | null;
+
+  /** Current portfolio Greeks */
+  greeks: PortfolioGreeks | null;
+
+  /** Current concentration risk analysis */
+  concentration: ConcentrationResult | null;
 
   /** Whether the store is currently loading */
   loading: boolean;
@@ -38,6 +48,12 @@ export interface RiskStoreState {
   /** Fetch settlement timeline from the risk engine */
   fetchSettlement: () => Promise<void>;
 
+  /** Fetch portfolio Greeks from the risk engine */
+  fetchGreeks: () => Promise<void>;
+
+  /** Fetch concentration risk from the risk engine */
+  fetchConcentration: () => Promise<void>;
+
   /** Apply a real-time risk update from WebSocket */
   applyUpdate: (update: RiskUpdate) => void;
 
@@ -49,6 +65,8 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
   var: null,
   drawdown: null,
   settlement: null,
+  greeks: null,
+  concentration: null,
   loading: false,
   error: null,
 
@@ -90,6 +108,24 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
     }
   },
 
+  fetchGreeks: async (): Promise<void> => {
+    try {
+      const data = await apiFetchGreeks();
+      set({ greeks: data });
+    } catch {
+      // Greeks are supplementary — don't overwrite primary error state
+    }
+  },
+
+  fetchConcentration: async (): Promise<void> => {
+    try {
+      const data = await apiFetchConcentration();
+      set({ concentration: data });
+    } catch {
+      // Concentration is supplementary — don't overwrite primary error state
+    }
+  },
+
   applyUpdate: (update: RiskUpdate): void => {
     switch (update.type) {
       case "var_update":
@@ -109,6 +145,8 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
     get().fetchVaR();
     get().fetchDrawdown();
     get().fetchSettlement();
+    get().fetchGreeks();
+    get().fetchConcentration();
 
     // Connect WebSocket for real-time updates
     let ws: ReconnectingWebSocket | null = createRiskStream((update) => {

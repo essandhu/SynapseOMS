@@ -11,6 +11,9 @@ import {
 import { useRiskStore } from "../stores/riskStore";
 import { VaRGauge } from "../components/VaRGauge";
 import { DrawdownChart } from "../components/DrawdownChart";
+import { MonteCarloPlot } from "../components/MonteCarloPlot";
+import { GreeksHeatmap } from "../components/GreeksHeatmap";
+import { ConcentrationTreemap } from "../components/ConcentrationTreemap";
 import type { SettlementTimeline } from "../api/types";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -205,12 +208,16 @@ export function RiskDashboard() {
   const varMetrics = useRiskStore((s) => s.var);
   const drawdown = useRiskStore((s) => s.drawdown);
   const settlement = useRiskStore((s) => s.settlement);
+  const greeks = useRiskStore((s) => s.greeks);
+  const concentration = useRiskStore((s) => s.concentration);
   const loading = useRiskStore((s) => s.loading);
   const error = useRiskStore((s) => s.error);
   const subscribe = useRiskStore((s) => s.subscribe);
   const fetchVaR = useRiskStore((s) => s.fetchVaR);
   const fetchDrawdown = useRiskStore((s) => s.fetchDrawdown);
   const fetchSettlement = useRiskStore((s) => s.fetchSettlement);
+  const fetchGreeks = useRiskStore((s) => s.fetchGreeks);
+  const fetchConcentration = useRiskStore((s) => s.fetchConcentration);
 
   // Subscribe to WebSocket on mount
   useEffect(() => {
@@ -225,12 +232,22 @@ export function RiskDashboard() {
       fetchVaR();
       fetchDrawdown();
       fetchSettlement();
+      fetchGreeks();
+      fetchConcentration();
     }, POLL_INTERVAL_MS);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetchVaR, fetchDrawdown, fetchSettlement]);
+  }, [fetchVaR, fetchDrawdown, fetchSettlement, fetchGreeks, fetchConcentration]);
+
+  // Parse Monte Carlo values from VaR response
+  const mcVarAmount =
+    varMetrics?.monteCarloVaR != null
+      ? parseFloat(varMetrics.monteCarloVaR)
+      : null;
+  const mcCvarAmount =
+    varMetrics?.cvar != null ? parseFloat(varMetrics.cvar) : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -269,25 +286,34 @@ export function RiskDashboard() {
           lastComputed={varMetrics?.computedAt ?? null}
           method="Parametric"
         />
-        {/* Monte Carlo — Phase 3 placeholder */}
-        <div className="flex flex-col items-center justify-center rounded border border-border border-dashed bg-bg-secondary p-4">
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
-            Monte Carlo VaR
-          </span>
-          <span className="mt-3 font-mono text-sm text-text-muted">
-            Coming Soon
-          </span>
-          <span className="mt-1 font-mono text-[10px] text-text-muted">
-            Phase 3
-          </span>
-        </div>
+        <VaRGauge
+          title="Monte Carlo VaR"
+          amount={varMetrics?.monteCarloVaR ?? null}
+          navPercentage={varNavPct(varMetrics?.monteCarloVaR ?? null)}
+          confidence={varMetrics?.confidence ?? 95}
+          lastComputed={varMetrics?.computedAt ?? null}
+          method="Monte Carlo"
+        />
       </div>
 
-      {/* Drawdown Chart — middle */}
-      <DrawdownChart
-        data={drawdown?.history ?? []}
-        currentDrawdown={drawdown?.current ?? 0}
+      {/* Monte Carlo Distribution Histogram */}
+      <MonteCarloPlot
+        distribution={varMetrics?.monteCarloDistribution ?? null}
+        varAmount={mcVarAmount}
+        cvarAmount={mcCvarAmount}
       />
+
+      {/* Greeks Heatmap */}
+      <GreeksHeatmap greeks={greeks} />
+
+      {/* Drawdown + Concentration — side by side */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <DrawdownChart
+          data={drawdown?.history ?? []}
+          currentDrawdown={drawdown?.current ?? 0}
+        />
+        <ConcentrationTreemap concentration={concentration} />
+      </div>
 
       {/* Settlement Risk — bottom */}
       <SettlementSection settlement={settlement} />

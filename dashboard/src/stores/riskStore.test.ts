@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useRiskStore } from "./riskStore";
-import type { VaRMetrics, DrawdownData, SettlementTimeline } from "../api/types";
+import type {
+  VaRMetrics,
+  DrawdownData,
+  SettlementTimeline,
+  PortfolioGreeks,
+  ConcentrationResult,
+} from "../api/types";
 
 // Mock the REST API module
 vi.mock("../api/rest", () => ({
   fetchVaR: vi.fn(),
   fetchDrawdown: vi.fn(),
   fetchSettlement: vi.fn(),
+  fetchGreeks: vi.fn(),
+  fetchConcentration: vi.fn(),
 }));
 
 // Mock the WebSocket module
@@ -15,7 +23,13 @@ vi.mock("../api/ws", () => ({
 }));
 
 // Import mocked modules so we can control their return values
-import { fetchVaR, fetchDrawdown, fetchSettlement } from "../api/rest";
+import {
+  fetchVaR,
+  fetchDrawdown,
+  fetchSettlement,
+  fetchGreeks,
+  fetchConcentration,
+} from "../api/rest";
 
 const mockVaR: VaRMetrics = {
   historicalVaR: "12500.00",
@@ -57,6 +71,23 @@ const mockSettlement: SettlementTimeline = {
   ],
 };
 
+const mockGreeks: PortfolioGreeks = {
+  total: { delta: 0.85, gamma: 0.02, vega: 15.3, theta: -2.1, rho: 0.5 },
+  byInstrument: {
+    AAPL: { delta: 0.45, gamma: 0.01, vega: 8.0, theta: -1.0, rho: 0.3 },
+    "BTC/USD": { delta: 0.4, gamma: 0.01, vega: 7.3, theta: -1.1, rho: 0.2 },
+  },
+  computedAt: "2026-04-01T10:00:00Z",
+};
+
+const mockConcentration: ConcentrationResult = {
+  singleName: { AAPL: 35, "BTC/USD": 25, ETH: 20, GOOG: 20 },
+  byAssetClass: { equity: 55, crypto: 45 },
+  byVenue: { "venue-1": 60, "venue-2": 40 },
+  warnings: ["AAPL exceeds 30% single-name threshold"],
+  hhi: 2450,
+};
+
 describe("riskStore", () => {
   beforeEach(() => {
     // Reset the store to initial state between tests
@@ -64,6 +95,8 @@ describe("riskStore", () => {
       var: null,
       drawdown: null,
       settlement: null,
+      greeks: null,
+      concentration: null,
       loading: false,
       error: null,
     });
@@ -75,6 +108,8 @@ describe("riskStore", () => {
     expect(state.var).toBeNull();
     expect(state.drawdown).toBeNull();
     expect(state.settlement).toBeNull();
+    expect(state.greeks).toBeNull();
+    expect(state.concentration).toBeNull();
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
   });
@@ -168,6 +203,51 @@ describe("riskStore", () => {
     const state = useRiskStore.getState();
     expect(state.settlement).toEqual(mockSettlement);
     expect(state.loading).toBe(false);
+  });
+
+  it("fetchGreeks calls API and sets greeks state", async () => {
+    vi.mocked(fetchGreeks).mockResolvedValue(mockGreeks);
+
+    await useRiskStore.getState().fetchGreeks();
+
+    expect(fetchGreeks).toHaveBeenCalledOnce();
+    const state = useRiskStore.getState();
+    expect(state.greeks).toEqual(mockGreeks);
+    expect(state.greeks?.total.delta).toBe(0.85);
+  });
+
+  it("fetchGreeks silently handles errors without setting error state", async () => {
+    vi.mocked(fetchGreeks).mockRejectedValue(new Error("Greeks unavailable"));
+
+    await useRiskStore.getState().fetchGreeks();
+
+    const state = useRiskStore.getState();
+    expect(state.greeks).toBeNull();
+    expect(state.error).toBeNull(); // Should NOT set error
+  });
+
+  it("fetchConcentration calls API and sets concentration state", async () => {
+    vi.mocked(fetchConcentration).mockResolvedValue(mockConcentration);
+
+    await useRiskStore.getState().fetchConcentration();
+
+    expect(fetchConcentration).toHaveBeenCalledOnce();
+    const state = useRiskStore.getState();
+    expect(state.concentration).toEqual(mockConcentration);
+    expect(state.concentration?.hhi).toBe(2450);
+    expect(state.concentration?.warnings).toHaveLength(1);
+  });
+
+  it("fetchConcentration silently handles errors without setting error state", async () => {
+    vi.mocked(fetchConcentration).mockRejectedValue(
+      new Error("Concentration unavailable"),
+    );
+
+    await useRiskStore.getState().fetchConcentration();
+
+    const state = useRiskStore.getState();
+    expect(state.concentration).toBeNull();
+    expect(state.error).toBeNull(); // Should NOT set error
   });
 
   it("sets loading to true during fetch", async () => {

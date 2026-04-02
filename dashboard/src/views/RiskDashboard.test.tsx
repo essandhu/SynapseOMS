@@ -7,6 +7,8 @@ const mockSubscribe = vi.fn(() => vi.fn());
 const mockFetchVaR = vi.fn();
 const mockFetchDrawdown = vi.fn();
 const mockFetchSettlement = vi.fn();
+const mockFetchGreeks = vi.fn();
+const mockFetchConcentration = vi.fn();
 
 let mockStoreState: Record<string, unknown> = {};
 
@@ -38,6 +40,18 @@ vi.mock("../components/DrawdownChart", () => ({
   DrawdownChart: () => <div data-testid="drawdown-chart" />,
 }));
 
+vi.mock("../components/MonteCarloPlot", () => ({
+  MonteCarloPlot: () => <div data-testid="monte-carlo-plot" />,
+}));
+
+vi.mock("../components/GreeksHeatmap", () => ({
+  GreeksHeatmap: () => <div data-testid="greeks-heatmap" />,
+}));
+
+vi.mock("../components/ConcentrationTreemap", () => ({
+  ConcentrationTreemap: () => <div data-testid="concentration-treemap" />,
+}));
+
 describe("RiskDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,40 +59,56 @@ describe("RiskDashboard", () => {
       var: null,
       drawdown: null,
       settlement: null,
+      greeks: null,
+      concentration: null,
       loading: false,
       error: null,
       subscribe: mockSubscribe,
       fetchVaR: mockFetchVaR,
       fetchDrawdown: mockFetchDrawdown,
       fetchSettlement: mockFetchSettlement,
+      fetchGreeks: mockFetchGreeks,
+      fetchConcentration: mockFetchConcentration,
     };
   });
 
-  it("renders VaR gauge components", () => {
+  it("renders VaR gauge components including Monte Carlo", () => {
     mockStoreState.var = {
       historicalVaR: "12500.00",
       parametricVaR: "11200.00",
-      monteCarloVaR: null,
+      monteCarloVaR: "13000.00",
       cvar: "15800.00",
       confidence: 95,
       horizon: "1d",
       computedAt: "2026-04-01T10:00:00Z",
-      monteCarloDistribution: null,
+      monteCarloDistribution: [100, 200, 300],
     };
 
     render(<RiskDashboard />);
 
     const gauges = screen.getAllByTestId("var-gauge");
-    expect(gauges).toHaveLength(2);
+    expect(gauges).toHaveLength(3);
     expect(screen.getByText("Historical VaR")).toBeInTheDocument();
     expect(screen.getByText("Parametric VaR")).toBeInTheDocument();
+    expect(screen.getByText("Monte Carlo VaR")).toBeInTheDocument();
   });
 
-  it("renders Monte Carlo placeholder", () => {
+  it("renders Monte Carlo plot component", () => {
     render(<RiskDashboard />);
 
-    expect(screen.getByText("Monte Carlo VaR")).toBeInTheDocument();
-    expect(screen.getByText("Coming Soon")).toBeInTheDocument();
+    expect(screen.getByTestId("monte-carlo-plot")).toBeInTheDocument();
+  });
+
+  it("renders Greeks heatmap component", () => {
+    render(<RiskDashboard />);
+
+    expect(screen.getByTestId("greeks-heatmap")).toBeInTheDocument();
+  });
+
+  it("renders concentration treemap component", () => {
+    render(<RiskDashboard />);
+
+    expect(screen.getByTestId("concentration-treemap")).toBeInTheDocument();
   });
 
   it("renders drawdown chart section", () => {

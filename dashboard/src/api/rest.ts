@@ -1,11 +1,13 @@
 import ky from "ky";
 import type {
+  ConcentrationResult,
   DrawdownData,
   ExposureData,
   Instrument,
   OptimizationConstraints,
   OptimizationResult,
   Order,
+  PortfolioGreeks,
   PortfolioSummary,
   Position,
   SettlementTimeline,
@@ -117,6 +119,16 @@ export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
 /** Fetch exposure data */
 export async function fetchExposure(): Promise<ExposureData> {
   return riskApi.get("api/v1/portfolio/exposure").json<ExposureData>();
+}
+
+/** Fetch portfolio Greeks */
+export async function fetchGreeks(): Promise<PortfolioGreeks> {
+  return riskApi.get("api/v1/risk/greeks").json<PortfolioGreeks>();
+}
+
+/** Fetch concentration risk analysis */
+export async function fetchConcentration(): Promise<ConcentrationResult> {
+  return riskApi.get("api/v1/risk/concentration").json<ConcentrationResult>();
 }
 
 /** Run portfolio optimization with given constraints */
