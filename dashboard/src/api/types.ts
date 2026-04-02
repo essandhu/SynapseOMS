@@ -87,6 +87,17 @@ export interface PositionUpdate {
   position: Position;
 }
 
+/** Tradeable instrument */
+export interface Instrument {
+  id: string;
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  baseCurrency: string;
+  quoteCurrency: string;
+  venueId: string;
+}
+
 /** Request payload for submitting a new order */
 export interface SubmitOrderRequest {
   instrumentId: string;

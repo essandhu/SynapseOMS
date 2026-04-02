@@ -1,5 +1,5 @@
 import ky from "ky";
-import type { Order, Position, Venue, SubmitOrderRequest } from "./types";
+import type { Instrument, Order, Position, Venue, SubmitOrderRequest } from "./types";
 
 const api = ky.create({
   prefixUrl: import.meta.env.VITE_API_URL || "/api",
@@ -32,6 +32,11 @@ export async function cancelOrder(id: string): Promise<void> {
 /** Fetch all positions */
 export async function fetchPositions(): Promise<Position[]> {
   return api.get("positions").json<Position[]>();
+}
+
+/** Fetch all instruments */
+export async function fetchInstruments(): Promise<Instrument[]> {
+  return api.get("instruments").json<Instrument[]>();
 }
 
 /** Fetch all venues */
