@@ -1,12 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 import { TerminalLayout } from "./components/TerminalLayout";
 import { PortfolioView } from "./views/PortfolioView";
-
-function BlotterView() {
-  return (
-    <div className="font-mono text-sm text-text-secondary">Blotter</div>
-  );
-}
+import { BlotterView } from "./views/BlotterView";
 
 export function App() {
   return (

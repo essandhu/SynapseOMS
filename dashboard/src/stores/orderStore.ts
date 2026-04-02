@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Order, OrderUpdate, SubmitOrderRequest } from "../api/types";
 import { submitOrder as apiSubmitOrder, cancelOrder as apiCancelOrder, fetchOrders } from "../api/rest";
+import { createOrderStream } from "../api/ws";
+import type ReconnectingWebSocket from "reconnecting-websocket";
 
 export interface OrderStoreState {
   /** All orders indexed by order ID */
@@ -26,6 +28,9 @@ export interface OrderStoreState {
 
   /** Load initial orders from REST API */
   loadOrders: () => Promise<void>;
+
+  /** Subscribe to real-time order updates via WebSocket and load initial data */
+  subscribe: () => () => void;
 }
 
 export const useOrderStore = create<OrderStoreState>()((set, get) => ({
@@ -96,5 +101,23 @@ export const useOrderStore = create<OrderStoreState>()((set, get) => ({
       const message = err instanceof Error ? err.message : "Failed to load orders";
       set({ loading: false, error: message });
     }
+  },
+
+  subscribe: (): (() => void) => {
+    // Load initial orders
+    get().loadOrders();
+
+    // Connect WebSocket for real-time updates
+    let ws: ReconnectingWebSocket | null = createOrderStream((update) => {
+      get().applyUpdate(update);
+    });
+
+    // Return unsubscribe function
+    return () => {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    };
   },
 }));
