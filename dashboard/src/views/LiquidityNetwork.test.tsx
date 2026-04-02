@@ -101,7 +101,9 @@ describe("LiquidityNetwork", () => {
     render(<LiquidityNetwork />);
 
     expect(screen.getByText("Liquidity Network")).toBeInTheDocument();
-    expect(screen.getByText("Manage venue connections")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Manage venue connections/),
+    ).toBeInTheDocument();
   });
 
   it("subscribes to venue store on mount", () => {

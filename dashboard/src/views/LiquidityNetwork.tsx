@@ -295,7 +295,7 @@ export function LiquidityNetwork() {
           Liquidity Network
         </h1>
         <p className="font-mono text-xs text-text-muted">
-          Manage venue connections
+          Manage venue connections &mdash; click any card to expand details
         </p>
       </div>
 
