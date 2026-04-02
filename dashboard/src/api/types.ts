@@ -202,6 +202,15 @@ export interface PortfolioGreeks {
   computedAt: string;
 }
 
+/** Concentration risk analysis result */
+export interface ConcentrationResult {
+  singleName: Record<string, number>;
+  byAssetClass: Record<string, number>;
+  byVenue: Record<string, number>;
+  warnings: string[];
+  hhi: number;
+}
+
 /** WebSocket update envelope for venue status changes */
 export interface VenueStatusUpdate {
   type: "venue_connected" | "venue_disconnected" | "venue_degraded";
