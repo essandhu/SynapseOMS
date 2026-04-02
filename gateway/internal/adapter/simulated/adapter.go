@@ -1,0 +1,185 @@
+package simulated
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/shopspring/decimal"
+	"github.com/synapse-oms/gateway/internal/adapter"
+	"github.com/synapse-oms/gateway/internal/domain"
+	"github.com/synapse-oms/gateway/internal/logging"
+)
+
+const (
+	venueID   = "sim-exchange"
+	venueName = "Simulated Exchange"
+)
+
+// defaultInstruments returns the six pre-loaded instruments.
+func defaultInstruments() []instrumentDef {
+	return []instrumentDef{
+		{id: "AAPL", symbol: "AAPL", name: "Apple Inc.", assetClass: domain.AssetClassEquity, price: 185.0, volatility: 0.30, drift: 0.05, quoteCurrency: "USD", settlement: domain.SettlementT2},
+		{id: "MSFT", symbol: "MSFT", name: "Microsoft Corp.", assetClass: domain.AssetClassEquity, price: 420.0, volatility: 0.30, drift: 0.05, quoteCurrency: "USD", settlement: domain.SettlementT2},
+		{id: "GOOG", symbol: "GOOG", name: "Alphabet Inc.", assetClass: domain.AssetClassEquity, price: 175.0, volatility: 0.30, drift: 0.05, quoteCurrency: "USD", settlement: domain.SettlementT2},
+		{id: "BTC-USD", symbol: "BTC-USD", name: "Bitcoin", assetClass: domain.AssetClassCrypto, price: 65000.0, volatility: 0.80, drift: 0.0, quoteCurrency: "USD", settlement: domain.SettlementT0},
+		{id: "ETH-USD", symbol: "ETH-USD", name: "Ethereum", assetClass: domain.AssetClassCrypto, price: 3500.0, volatility: 0.80, drift: 0.0, quoteCurrency: "USD", settlement: domain.SettlementT0},
+		{id: "SOL-USD", symbol: "SOL-USD", name: "Solana", assetClass: domain.AssetClassCrypto, price: 140.0, volatility: 0.80, drift: 0.0, quoteCurrency: "USD", settlement: domain.SettlementT0},
+	}
+}
+
+type instrumentDef struct {
+	id            string
+	symbol        string
+	name          string
+	assetClass    domain.AssetClass
+	price         float64
+	volatility    float64
+	drift         float64
+	quoteCurrency string
+	settlement    domain.SettlementCycle
+}
+
+// Adapter implements the adapter.LiquidityProvider interface for a simulated exchange.
+type Adapter struct {
+	engine      *MatchingEngine
+	fillCh      chan domain.Fill
+	instruments []domain.Instrument
+	status      adapter.VenueStatus
+	logger      *slog.Logger
+}
+
+// NewAdapter creates a new simulated exchange adapter.
+func NewAdapter(_ map[string]string) adapter.LiquidityProvider {
+	fillCh := make(chan domain.Fill, 1000)
+	engine := NewMatchingEngine(fillCh)
+	logger := logging.NewDefault("gateway", "simulated-adapter")
+
+	defs := defaultInstruments()
+	instruments := make([]domain.Instrument, 0, len(defs))
+
+	for _, d := range defs {
+		engine.RegisterInstrument(d.id, decimal.NewFromFloat(d.price), d.volatility, d.drift, 100*time.Millisecond)
+
+		tickSize := decimal.NewFromFloat(0.01)
+		lotSize := decimal.NewFromInt(1)
+		schedule := domain.TradingSchedule{
+			MarketOpen:  "09:30",
+			MarketClose: "16:00",
+			PreMarket:   "04:00",
+			AfterHours:  "20:00",
+			Timezone:    "America/New_York",
+		}
+		if d.assetClass == domain.AssetClassCrypto {
+			tickSize = decimal.NewFromFloat(0.01)
+			lotSize = decimal.NewFromFloat(0.0001)
+			schedule = domain.TradingSchedule{Is24x7: true}
+		}
+
+		instruments = append(instruments, domain.Instrument{
+			ID:              d.id,
+			Symbol:          d.symbol,
+			Name:            d.name,
+			AssetClass:      d.assetClass,
+			QuoteCurrency:   d.quoteCurrency,
+			TickSize:        tickSize,
+			LotSize:         lotSize,
+			SettlementCycle: d.settlement,
+			TradingHours:    schedule,
+			Venues:          []string{venueID},
+		})
+	}
+
+	return &Adapter{
+		engine:      engine,
+		fillCh:      fillCh,
+		instruments: instruments,
+		status:      adapter.Disconnected,
+		logger:      logger,
+	}
+}
+
+func (a *Adapter) VenueID() string   { return venueID }
+func (a *Adapter) VenueName() string  { return venueName }
+
+func (a *Adapter) SupportedInstruments() ([]domain.Instrument, error) {
+	return a.instruments, nil
+}
+
+func (a *Adapter) Connect(_ context.Context) error {
+	a.logger.Info("connecting to simulated exchange")
+	a.engine.Start()
+	a.status = adapter.Connected
+	a.logger.Info("connected to simulated exchange")
+	return nil
+}
+
+func (a *Adapter) Disconnect(_ context.Context) error {
+	a.logger.Info("disconnecting from simulated exchange")
+	a.engine.Stop()
+	a.status = adapter.Disconnected
+	a.logger.Info("disconnected from simulated exchange")
+	return nil
+}
+
+func (a *Adapter) Status() adapter.VenueStatus {
+	return a.status
+}
+
+func (a *Adapter) SubmitOrder(_ context.Context, order *domain.Order) (*adapter.VenueAck, error) {
+	if a.status != adapter.Connected {
+		return nil, fmt.Errorf("simulated exchange not connected")
+	}
+
+	a.logger.Info("submitting order",
+		slog.String("order_id", string(order.ID)),
+		slog.String("instrument", order.InstrumentID),
+		slog.String("side", fmt.Sprintf("%d", order.Side)),
+		slog.String("type", fmt.Sprintf("%d", order.Type)),
+	)
+
+	venueOrderID := fmt.Sprintf("SIM-%s", order.ID)
+	a.engine.ProcessOrder(order)
+
+	return &adapter.VenueAck{
+		VenueOrderID: venueOrderID,
+		ReceivedAt:   time.Now(),
+	}, nil
+}
+
+func (a *Adapter) CancelOrder(_ context.Context, orderID domain.OrderID, venueOrderID string) error {
+	if a.status != adapter.Connected {
+		return fmt.Errorf("simulated exchange not connected")
+	}
+
+	a.logger.Info("canceling order",
+		slog.String("order_id", string(orderID)),
+		slog.String("venue_order_id", venueOrderID),
+	)
+
+	// Remove from order books
+	a.engine.mu.RLock()
+	defer a.engine.mu.RUnlock()
+	for _, book := range a.engine.books {
+		book.mu.Lock()
+		remaining := make([]*domain.Order, 0, len(book.orders))
+		for _, o := range book.orders {
+			if o.ID != orderID {
+				remaining = append(remaining, o)
+			}
+		}
+		book.orders = remaining
+		book.mu.Unlock()
+	}
+
+	return nil
+}
+
+func (a *Adapter) FillFeed() <-chan domain.Fill {
+	return a.fillCh
+}
+
+func init() {
+	adapter.Register("simulated", NewAdapter)
+}
