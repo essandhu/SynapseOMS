@@ -14,6 +14,9 @@ import type {
   VaRMetrics,
   Venue,
   SubmitOrderRequest,
+  ExecutionReport,
+  AnomalyAlert,
+  RebalanceResult,
 } from "./types";
 
 const api = ky.create({
@@ -138,4 +141,48 @@ export async function optimizePortfolio(
   return riskApi
     .post("api/v1/optimizer/optimize", { json: constraints })
     .json<OptimizationResult>();
+}
+
+// ── AI & Anomaly Endpoints ──────────────────────────────────────────
+
+/** Fetch AI execution reports */
+export async function fetchExecutionReports(
+  limit: number = 20,
+): Promise<ExecutionReport[]> {
+  return riskApi
+    .get("api/v1/ai/execution-reports", { searchParams: { limit } })
+    .json<ExecutionReport[]>();
+}
+
+/** Submit a natural language rebalancing prompt */
+export async function submitRebalancePrompt(
+  prompt: string,
+): Promise<RebalanceResult> {
+  return riskApi
+    .post("api/v1/ai/rebalance", { json: { prompt } })
+    .json<RebalanceResult>();
+}
+
+/** Fetch anomaly alerts */
+export async function fetchAnomalyAlerts(params?: {
+  limit?: number;
+  severity?: string;
+  instrumentId?: string;
+}): Promise<{ alerts: AnomalyAlert[]; total: number }> {
+  const searchParams: Record<string, string | number> = {};
+  if (params?.limit) searchParams.limit = params.limit;
+  if (params?.severity) searchParams.severity = params.severity;
+  if (params?.instrumentId) searchParams.instrument_id = params.instrumentId;
+  return riskApi
+    .get("api/v1/anomalies", { searchParams })
+    .json<{ alerts: AnomalyAlert[]; total: number }>();
+}
+
+/** Acknowledge an anomaly alert */
+export async function acknowledgeAnomalyAlert(
+  alertId: string,
+): Promise<AnomalyAlert> {
+  return riskApi
+    .post(`api/v1/anomalies/${alertId}/acknowledge`)
+    .json<AnomalyAlert>();
 }
