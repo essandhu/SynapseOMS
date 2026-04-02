@@ -252,11 +252,13 @@ func TestSubmitOrderAppearsAsNew(t *testing.T) {
 		t.Fatalf("expected status New, got %d", order.Status)
 	}
 
-	// Order should be persisted as New by the router goroutine
+	// Order should be persisted by the router goroutine.
+	// It may already have transitioned to Acknowledged by the time we check,
+	// so we verify the order exists and has progressed at least to New.
 	waitFor(t, 2*time.Second, func() bool {
 		o := store.getOrder(order.ID)
-		return o != nil && o.Status == domain.OrderStatusNew
-	}, "order to be persisted as New")
+		return o != nil && o.Status >= domain.OrderStatusNew
+	}, "order to be persisted")
 }
 
 func TestPipelineTransitionsToAcknowledged(t *testing.T) {
