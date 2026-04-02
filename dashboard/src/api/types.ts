@@ -159,6 +159,33 @@ export type RiskUpdate =
   | { type: "drawdown_update"; payload: DrawdownData }
   | { type: "settlement_update"; payload: SettlementTimeline };
 
+/** Constraints for portfolio optimization */
+export interface OptimizationConstraints {
+  riskAversion: number;
+  longOnly: boolean;
+  maxSingleWeight: number | null;
+  targetVolatility: number | null;
+  maxTurnover: number | null;
+  assetClassBounds: Record<string, [number, number]> | null;
+}
+
+/** Result from the portfolio optimizer */
+export interface OptimizationResult {
+  targetWeights: Record<string, number>;
+  trades: TradeAction[];
+  expectedReturn: number;
+  expectedVolatility: number;
+  sharpeRatio: number;
+}
+
+/** A single trade action recommended by the optimizer */
+export interface TradeAction {
+  instrumentId: string;
+  side: "buy" | "sell";
+  quantity: string;
+  estimatedCost: string;
+}
+
 /** WebSocket update envelope for venue status changes */
 export interface VenueStatusUpdate {
   type: "venue_connected" | "venue_disconnected" | "venue_degraded";

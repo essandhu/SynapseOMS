@@ -3,6 +3,8 @@ import type {
   DrawdownData,
   ExposureData,
   Instrument,
+  OptimizationConstraints,
+  OptimizationResult,
   Order,
   PortfolioSummary,
   Position,
@@ -115,4 +117,13 @@ export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
 /** Fetch exposure data */
 export async function fetchExposure(): Promise<ExposureData> {
   return riskApi.get("api/v1/portfolio/exposure").json<ExposureData>();
+}
+
+/** Run portfolio optimization with given constraints */
+export async function optimizePortfolio(
+  constraints: OptimizationConstraints,
+): Promise<OptimizationResult> {
+  return riskApi
+    .post("api/v1/optimizer/optimize", { json: constraints })
+    .json<OptimizationResult>();
 }
