@@ -12,41 +12,41 @@
 
 ## Gateway Service
 
-- [ ] gateway/cmd/gateway/main.go (entry point, startup health checks, graceful shutdown)
-- [ ] gateway/internal/domain/order.go (Order aggregate, state machine with transitions)
-- [ ] gateway/internal/domain/fill.go (Fill / ExecutionReport value object)
-- [ ] gateway/internal/domain/instrument.go (Instrument value object, AssetClass, SettlementCycle, TradingSchedule)
-- [ ] gateway/internal/domain/position.go (Position aggregate with P&L, settled/unsettled quantities)
+- [x] gateway/cmd/gateway/main.go (entry point, startup health checks, graceful shutdown)
+- [x] gateway/internal/domain/order.go (Order aggregate, state machine with transitions)
+- [x] gateway/internal/domain/fill.go (Fill / ExecutionReport value object)
+- [x] gateway/internal/domain/instrument.go (Instrument value object, AssetClass, SettlementCycle, TradingSchedule)
+- [x] gateway/internal/domain/position.go (Position aggregate with P&L, settled/unsettled quantities)
 - [ ] gateway/internal/domain/venue_credential.go (VenueCredential with encrypted fields)
 - [ ] gateway/internal/orderbook/book.go (in-memory order book per instrument)
 - [ ] gateway/internal/router/router.go (routing engine)
 - [ ] gateway/internal/router/strategy.go (routing strategies: best-price, TWAP, ML-scored)
 - [ ] gateway/internal/router/ml_scorer.go (ML model inference for venue scoring via Python sidecar)
 - [ ] gateway/internal/crossing/engine.go (dark pool / internal crossing engine)
-- [ ] gateway/internal/adapter/provider.go (LiquidityProvider interface definition)
-- [ ] gateway/internal/adapter/registry.go (adapter registration and discovery)
+- [x] gateway/internal/adapter/provider.go (LiquidityProvider interface definition)
+- [x] gateway/internal/adapter/registry.go (adapter registration and discovery)
 - [ ] gateway/internal/adapter/alpaca/adapter.go (Alpaca adapter, REST + paper trading)
 - [ ] gateway/internal/adapter/alpaca/ws_feed.go (Alpaca WebSocket market data feed)
 - [ ] gateway/internal/adapter/binance/adapter.go (Binance testnet adapter, REST execution)
 - [ ] gateway/internal/adapter/binance/ws_feed.go (Binance WebSocket market data feed)
-- [ ] gateway/internal/adapter/simulated/matching_engine.go (simulated multi-asset matching engine)
-- [ ] gateway/internal/adapter/simulated/price_walk.go (geometric Brownian motion price generator)
+- [x] gateway/internal/adapter/simulated/matching_engine.go (simulated multi-asset matching engine)
+- [x] gateway/internal/adapter/simulated/price_walk.go (geometric Brownian motion price generator)
 - [ ] gateway/internal/adapter/tokenized/adapter.go (tokenized securities adapter, T+0 settlement)
 - [ ] gateway/internal/credential/manager.go (encrypt/decrypt with Argon2id + AES-256-GCM)
 - [ ] gateway/internal/credential/vault.go (on-disk encrypted storage in PostgreSQL)
-- [ ] gateway/internal/pipeline/pipeline.go (intake -> risk check -> route -> fill -> notify)
-- [ ] gateway/internal/pipeline/stage.go (pipeline stage interface)
+- [x] gateway/internal/pipeline/pipeline.go (intake -> risk check -> route -> fill -> notify)
+- [~] gateway/internal/pipeline/stage.go — SUPERSEDED: pipeline uses goroutine-based stages, not a Stage interface
 - [ ] gateway/internal/kafka/producer.go (Kafka producer for order-lifecycle, market-data, venue-status topics)
 - [ ] gateway/internal/grpc/risk_client.go (gRPC client for pre-trade risk checks)
-- [ ] gateway/internal/ws/server.go (WebSocket server: /ws/orders, /ws/positions, /ws/marketdata, /ws/venues)
-- [ ] gateway/internal/rest/handler_order.go (REST: submit, cancel, list, get orders)
-- [ ] gateway/internal/rest/handler_position.go (REST: list positions, get position by instrument)
+- [x] gateway/internal/ws/server.go (WebSocket server: /ws/orders, /ws/positions, /ws/marketdata, /ws/venues)
+- [x] gateway/internal/rest/handler_order.go (REST: submit, cancel, list, get orders)
+- [x] gateway/internal/rest/handler_position.go (REST: list positions, get position by instrument)
 - [ ] gateway/internal/rest/handler_venue.go (REST: list venues, connect, disconnect)
 - [ ] gateway/internal/rest/handler_credential.go (REST: store/delete venue credentials)
-- [ ] gateway/go.mod
-- [ ] gateway/go.sum
-- [ ] gateway/Dockerfile
-- [ ] PostgreSQL schema + migrations (orders, fills, positions, instruments, venues, credentials tables)
+- [x] gateway/go.mod
+- [x] gateway/go.sum
+- [x] gateway/Dockerfile
+- [x] PostgreSQL schema + migrations (orders, fills, positions, instruments, venues, credentials tables) — PARTIAL: Phase 1 tables only (no venues/credentials tables yet)
 
 ## Risk Engine
 
@@ -79,25 +79,25 @@
 
 ## Dashboard
 
-- [ ] dashboard/src/main.tsx (app entry point)
-- [ ] dashboard/src/App.tsx (root layout + routing + stream initialization)
-- [ ] dashboard/src/api/rest.ts (REST client wrapper)
-- [ ] dashboard/src/api/ws.ts (WebSocket client with reconnect for all streams)
-- [ ] dashboard/src/api/types.ts (TypeScript types generated from proto)
-- [ ] dashboard/src/stores/orderStore.ts (Zustand order state, submit, cancel, applyUpdate)
-- [ ] dashboard/src/stores/positionStore.ts (Zustand position state)
+- [x] dashboard/src/main.tsx (app entry point)
+- [x] dashboard/src/App.tsx (root layout + routing + stream initialization)
+- [x] dashboard/src/api/rest.ts (REST client wrapper)
+- [x] dashboard/src/api/ws.ts (WebSocket client with reconnect for all streams)
+- [x] dashboard/src/api/types.ts (TypeScript types generated from proto)
+- [x] dashboard/src/stores/orderStore.ts (Zustand order state, submit, cancel, applyUpdate)
+- [x] dashboard/src/stores/positionStore.ts (Zustand position state)
 - [ ] dashboard/src/stores/riskStore.ts (Zustand risk metrics state)
 - [ ] dashboard/src/stores/venueStore.ts (Zustand venue status state)
 - [ ] dashboard/src/stores/insightStore.ts (Zustand AI insights state)
-- [ ] dashboard/src/views/BlotterView.tsx (AG Grid order blotter with streaming updates, filters, order ticket panel)
-- [ ] dashboard/src/views/PortfolioView.tsx (position table, NAV summary cards, exposure breakdown charts)
+- [x] dashboard/src/views/BlotterView.tsx (AG Grid order blotter with streaming updates, filters, order ticket panel)
+- [x] dashboard/src/views/PortfolioView.tsx (position table, NAV summary cards, exposure breakdown charts) — PARTIAL: position table only, no summary cards or charts (Phase 2+)
 - [ ] dashboard/src/views/RiskDashboard.tsx (VaR gauges, MC distribution histogram, Greeks heatmap, drawdown chart, concentration treemap, settlement timeline)
 - [ ] dashboard/src/views/LiquidityNetwork.tsx (venue status cards, connect new venue, per-venue drill-down)
 - [ ] dashboard/src/views/InsightsPanel.tsx (execution analysis tab, rebalancing tab with NL input, anomaly alerts tab)
 - [ ] dashboard/src/views/OnboardingView.tsx (5-step onboarding: welcome, passphrase, venue choice, credentials, first order)
-- [ ] dashboard/src/components/OrderTicket.tsx (order entry form: instrument picker, side, type, qty, price, venue/"Smart Route")
-- [ ] dashboard/src/components/OrderTable.tsx (AG Grid blotter table)
-- [ ] dashboard/src/components/PositionTable.tsx (position data grid)
+- [x] dashboard/src/components/OrderTicket.tsx (order entry form: instrument picker, side, type, qty, price, venue/"Smart Route")
+- [x] dashboard/src/components/OrderTable.tsx (AG Grid blotter table)
+- [x] dashboard/src/components/PositionTable.tsx (position data grid)
 - [ ] dashboard/src/components/VaRGauge.tsx (VaR visualization gauge with color coding)
 - [ ] dashboard/src/components/ExposureTreemap.tsx (D3 treemap for exposure/concentration)
 - [ ] dashboard/src/components/DrawdownChart.tsx (Recharts drawdown time series)
@@ -105,13 +105,13 @@
 - [ ] dashboard/src/components/CandlestickChart.tsx (Lightweight Charts wrapper for OHLC)
 - [ ] dashboard/src/components/VenueCard.tsx (venue status card with latency, fill rate, heartbeat)
 - [ ] dashboard/src/components/CredentialForm.tsx (secure API key input modal)
-- [ ] dashboard/src/components/TerminalLayout.tsx (dark terminal shell + panel layout)
-- [ ] dashboard/src/theme/terminal.ts (dark theme tokens: colors, fonts)
-- [ ] dashboard/index.html
-- [ ] dashboard/vite.config.ts
-- [ ] dashboard/tsconfig.json
-- [ ] dashboard/package.json
-- [ ] dashboard/Dockerfile
+- [x] dashboard/src/components/TerminalLayout.tsx (dark terminal shell + panel layout)
+- [x] dashboard/src/theme/terminal.ts (dark theme tokens: colors, fonts)
+- [x] dashboard/index.html
+- [x] dashboard/vite.config.ts
+- [x] dashboard/tsconfig.json
+- [x] dashboard/package.json
+- [x] dashboard/Dockerfile
 
 ## AI Modules
 
@@ -126,7 +126,7 @@
 
 ## Infrastructure
 
-- [ ] deploy/docker-compose.yml (gateway, risk-engine, dashboard, ml-scorer, kafka, postgres, redis, prometheus, grafana)
+- [x] deploy/docker-compose.yml (gateway, risk-engine, dashboard, ml-scorer, kafka, postgres, redis, prometheus, grafana) — PARTIAL: Phase 1 subset (gateway, dashboard, postgres, redis only)
 - [ ] deploy/docker-compose.dev.yml (dev overrides: hot reload, debug ports)
 - [ ] deploy/k8s/namespace.yaml
 - [ ] deploy/k8s/gateway-deployment.yaml
@@ -143,12 +143,12 @@
 - [ ] loadtest/k6/order_flow.js (realistic order submission load test, 5k orders/sec target)
 - [ ] loadtest/k6/ws_stream.js (WebSocket streaming load test)
 - [ ] loadtest/README.md
-- [ ] Makefile (top-level build targets)
+- [x] Makefile (top-level build targets)
 
 ## Scripts
 
 - [x] scripts/proto-gen.sh (generate Go + Python + TS from protos using buf)
-- [ ] scripts/seed-instruments.sh (seed instrument reference data: AAPL, MSFT, GOOG, BTC-USD, ETH-USD, SOL-USD)
+- [x] scripts/seed-instruments.sh (seed instrument reference data: AAPL, MSFT, GOOG, BTC-USD, ETH-USD, SOL-USD)
 - [ ] scripts/health-check.sh (verify all services healthy)
 
 ## Documentation
@@ -173,11 +173,11 @@
 - [ ] gateway/internal/crossing/engine_test.go (crossing engine unit tests)
 - [ ] gateway/internal/adapter/alpaca/adapter_test.go (Alpaca adapter unit tests)
 - [ ] gateway/internal/adapter/binance/adapter_test.go (Binance adapter unit tests)
-- [ ] gateway/internal/adapter/simulated/matching_engine_test.go (simulated exchange unit tests)
+- [x] gateway/internal/adapter/simulated/matching_engine_test.go (simulated exchange unit tests)
 - [ ] gateway/internal/adapter/tokenized/adapter_test.go (tokenized adapter unit tests)
 - [ ] gateway/internal/credential/manager_test.go (credential manager unit tests)
-- [ ] gateway/internal/pipeline/pipeline_test.go (pipeline unit tests)
-- [ ] gateway/internal/domain/order_test.go (order state machine transition tests)
+- [x] gateway/internal/pipeline/pipeline_test.go (pipeline unit tests)
+- [x] gateway/internal/domain/order_test.go (order state machine transition tests)
 - [ ] risk_engine/var/var_test.py (VaR module-level tests)
 - [ ] risk_engine/greeks/calculator_test.py (Greeks calculator tests)
 - [ ] risk_engine/concentration/analyzer_test.py (concentration analyzer tests)
@@ -194,8 +194,8 @@
 - [ ] ai/execution_analyst/analyst_test.py (execution analyst tests)
 - [ ] ai/rebalancing_assistant/assistant_test.py (rebalancing assistant tests)
 - [ ] ai/smart_router_ml/model_test.py (ML scorer tests)
-- [ ] dashboard/src/components/OrderTicket.test.tsx (order ticket component tests)
-- [ ] gateway/integration_test.go (order -> risk check -> route -> fill -> position flow)
+- [x] dashboard/src/components/OrderTicket.test.tsx (order ticket component tests)
+- [x] gateway/integration_test.go (order -> risk check -> route -> fill -> position flow)
 - [ ] gateway/internal/adapter/contract_test.go (AdapterContractSuite shared contract tests)
 - [ ] E2E: connect venue -> submit order -> see fill -> check risk (Playwright)
 - [ ] E2E: multi-venue portfolio unified view (Playwright)
