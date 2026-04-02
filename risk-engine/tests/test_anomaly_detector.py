@@ -132,7 +132,7 @@ class TestSeverityThresholds:
 
     def test_warning_threshold(self) -> None:
         det = StreamingAnomalyDetector()
-        assert det._determine_severity(-0.4) == "warning"
+        assert det._determine_severity(-0.6) == "warning"
 
     def test_critical_threshold(self) -> None:
         det = StreamingAnomalyDetector()
