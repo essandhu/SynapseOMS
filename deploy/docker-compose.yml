@@ -95,6 +95,7 @@ services:
       - KAFKA_BROKERS=kafka:9092
       - POSTGRES_URL=postgresql://synapse:synapse@postgres:5432/synapse
       - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       kafka:
         condition: service_healthy
