@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { OrderTable } from "../components/OrderTable";
 import { OrderTicket } from "../components/OrderTicket";
 import { useOrderStore } from "../stores/orderStore";
+import { useVenueStore } from "../stores/venueStore";
 import { fetchInstruments } from "../api/rest";
 import type { Instrument, OrderStatus } from "../api/types";
 
@@ -24,6 +25,10 @@ export function BlotterView() {
   const submitOrder = useOrderStore((s) => s.submitOrder);
   const cancelOrder = useOrderStore((s) => s.cancelOrder);
 
+  const venueMap = useVenueStore((s) => s.venues);
+  const loadVenues = useVenueStore((s) => s.loadVenues);
+  const venues = useMemo(() => Array.from(venueMap.values()), [venueMap]);
+
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [ticketOpen, setTicketOpen] = useState(true);
@@ -34,14 +39,17 @@ export function BlotterView() {
     return unsubscribe;
   }, [subscribe]);
 
-  // Load instruments for the order ticket
+  // Load instruments and venues for the order ticket
   useEffect(() => {
     fetchInstruments()
       .then(setInstruments)
       .catch(() => {
         /* instruments will be empty */
       });
-  }, []);
+    loadVenues().catch(() => {
+      /* venues will be empty */
+    });
+  }, [loadVenues]);
 
   // Filter orders based on current tab
   const filteredOrders = useMemo(() => {
@@ -121,7 +129,7 @@ export function BlotterView() {
       {/* Order ticket sidebar */}
       {ticketOpen && (
         <div className="w-[360px] shrink-0">
-          <OrderTicket instruments={instruments} onSubmit={submitOrder} />
+          <OrderTicket instruments={instruments} venues={venues} onSubmit={submitOrder} />
         </div>
       )}
     </div>
