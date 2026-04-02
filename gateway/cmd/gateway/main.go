@@ -20,12 +20,14 @@ import (
 	_ "github.com/synapse-oms/gateway/internal/adapter/binance"
 	_ "github.com/synapse-oms/gateway/internal/adapter/simulated"
 	"github.com/synapse-oms/gateway/internal/credential"
+	"github.com/synapse-oms/gateway/internal/crossing"
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
 	"github.com/synapse-oms/gateway/internal/kafka"
 	"github.com/synapse-oms/gateway/internal/logging"
 	"github.com/synapse-oms/gateway/internal/pipeline"
 	"github.com/synapse-oms/gateway/internal/rest"
+	"github.com/synapse-oms/gateway/internal/router"
 	"github.com/synapse-oms/gateway/internal/store"
 	"github.com/synapse-oms/gateway/internal/ws"
 	"github.com/synapse-oms/gateway/migrations"
@@ -41,6 +43,7 @@ func main() {
 	viper.SetDefault("KAFKA_BROKERS", "")
 	viper.SetDefault("RISK_ENGINE_GRPC", "")
 	viper.SetDefault("SYNAPSE_MASTER_PASSPHRASE", "")
+	viper.SetDefault("ML_SCORER_URL", "http://localhost:8090")
 	viper.AutomaticEnv()
 
 	port := viper.GetString("PORT")
@@ -49,6 +52,7 @@ func main() {
 	kafkaBrokers := viper.GetString("KAFKA_BROKERS")
 	riskEngineAddr := viper.GetString("RISK_ENGINE_GRPC")
 	masterPassphrase := viper.GetString("SYNAPSE_MASTER_PASSPHRASE")
+	mlScorerURL := viper.GetString("ML_SCORER_URL")
 
 	// -------------------------------------------------------
 	// 2. Initialize structured JSON logging
@@ -258,7 +262,37 @@ func main() {
 	logger.Info("WebSocket hub ready")
 
 	// -------------------------------------------------------
-	// 11. Initialize pipeline
+	// 11a. Initialize smart order router
+	// -------------------------------------------------------
+	logger.Info("initializing smart order router")
+	bestPrice := router.NewBestPriceStrategy()
+	venuePref := router.NewVenuePreferenceStrategy(bestPrice)
+
+	smartRouter := router.New()
+	smartRouter.Register(bestPrice) // first registered becomes default
+	smartRouter.Register(venuePref)
+
+	if mlScorerURL != "" {
+		scorer := router.NewMLScorer(mlScorerURL + "/score")
+		mlStrategy := router.NewMLStrategy(scorer, bestPrice)
+		smartRouter.Register(mlStrategy)
+		logger.Info("ML scoring strategy registered", slog.String("ml_scorer_url", mlScorerURL))
+	}
+
+	pipelineOpts = append(pipelineOpts, pipeline.WithRouter(smartRouter))
+	logger.Info("smart order router initialized",
+		slog.Any("strategies", smartRouter.Strategies()))
+
+	// -------------------------------------------------------
+	// 11b. Initialize internal crossing engine
+	// -------------------------------------------------------
+	logger.Info("initializing internal crossing engine")
+	crossingEngine := crossing.NewCrossingEngine()
+	pipelineOpts = append(pipelineOpts, pipeline.WithCrossingEngine(crossingEngine))
+	logger.Info("internal crossing engine initialized")
+
+	// -------------------------------------------------------
+	// 11c. Initialize pipeline
 	// -------------------------------------------------------
 	logger.Info("initializing order processing pipeline")
 	p := pipeline.NewPipeline(pgStore, venues, hub, riskClient, pipelineOpts...)
@@ -285,11 +319,11 @@ func main() {
 		)
 	}
 
-	router := rest.NewRouter(p, pgStore, routerOpts...)
+	restRouter := rest.NewRouter(p, pgStore, routerOpts...)
 
 	// Mount WebSocket upgrade endpoints on the same mux.
 	mux := http.NewServeMux()
-	mux.Handle("/", router)
+	mux.Handle("/", restRouter)
 	mux.HandleFunc("/ws/orders", wsSrv.HandleOrders)
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
 	mux.HandleFunc("/ws/venues", wsSrv.HandleVenues)

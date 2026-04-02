@@ -21,6 +21,7 @@ type submitOrderRequest struct {
 	Quantity      string `json:"quantity"`
 	Price         string `json:"price"`
 	ClientOrderID string `json:"client_order_id"`
+	VenueID       string `json:"venue_id"`
 }
 
 // orderResponse is the JSON response for an order.
@@ -169,6 +170,13 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 		orderType = domain.OrderTypeLimit
 	}
 
+	// Determine venue ID: empty or "smart" triggers smart routing (leave VenueID empty);
+	// a specific venue ID triggers venue-preference strategy.
+	venueID := strings.TrimSpace(req.VenueID)
+	if strings.EqualFold(venueID, "smart") {
+		venueID = ""
+	}
+
 	order := &domain.Order{
 		InstrumentID:  req.InstrumentID,
 		ClientOrderID: req.ClientOrderID,
@@ -176,6 +184,7 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 		Type:          orderType,
 		Quantity:      quantity,
 		Price:         price,
+		VenueID:       venueID,
 	}
 
 	if err := h.pipeline.Submit(r.Context(), order); err != nil {
