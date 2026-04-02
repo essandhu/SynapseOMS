@@ -5,6 +5,7 @@ import { PortfolioView } from "./views/PortfolioView";
 import { BlotterView } from "./views/BlotterView";
 import { RiskDashboard } from "./views/RiskDashboard";
 import { LiquidityNetwork } from "./views/LiquidityNetwork";
+import { OptimizerView } from "./views/OptimizerView";
 import { OnboardingView } from "./views/OnboardingView";
 import { fetchVenues } from "./api/rest";
 
@@ -61,6 +62,7 @@ function AppRoutes() {
         <Route path="portfolio" element={<PortfolioView />} />
         <Route path="risk" element={<RiskDashboard />} />
         <Route path="venues" element={<LiquidityNetwork />} />
+        <Route path="optimizer" element={<OptimizerView />} />
       </Route>
       {needsOnboarding && (
         <Route path="*" element={<Navigate to="/onboarding" replace />} />

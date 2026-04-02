@@ -5,6 +5,7 @@ const NAV_TABS = [
   { label: "Portfolio", to: "/portfolio" },
   { label: "Risk", to: "/risk" },
   { label: "Venues", to: "/venues" },
+  { label: "Optimizer", to: "/optimizer" },
 ] as const;
 
 export function TerminalLayout() {
