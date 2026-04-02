@@ -9,10 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/synapse-oms/gateway/internal/adapter"
+	"github.com/synapse-oms/gateway/internal/crossing"
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
 	"github.com/synapse-oms/gateway/internal/logging"
+	"github.com/synapse-oms/gateway/internal/router"
 )
 
 const intakeChanSize = 10_000
@@ -54,6 +57,11 @@ type Pipeline struct {
 	kafka      KafkaPublisher // nil if Kafka is not configured
 	logger     *slog.Logger
 
+	// Smart routing: optional router and crossing engine (Phase 3).
+	// When nil, the pipeline falls back to legacy asset-class-based routing.
+	orderRouter    *router.Router
+	crossingEngine *crossing.CrossingEngine
+
 	// failOpenRisk controls whether risk engine unavailability should fail-open.
 	// When true (default for paper trading), orders pass if the risk engine is unreachable.
 	failOpenRisk bool
@@ -85,6 +93,24 @@ func WithKafkaPublisher(kp KafkaPublisher) Option {
 func WithFailOpenRisk(failOpen bool) Option {
 	return func(p *Pipeline) {
 		p.failOpenRisk = failOpen
+	}
+}
+
+// WithRouter injects a smart order router into the pipeline.
+// When set, the router() goroutine delegates to this router instead of
+// the legacy asset-class-based routeOrder() method.
+func WithRouter(r *router.Router) Option {
+	return func(p *Pipeline) {
+		p.orderRouter = r
+	}
+}
+
+// WithCrossingEngine injects an internal crossing engine into the pipeline.
+// When set, the router() goroutine attempts internal crossing before
+// dispatching to external venues.
+func WithCrossingEngine(e *crossing.CrossingEngine) Option {
+	return func(p *Pipeline) {
+		p.crossingEngine = e
 	}
 }
 
@@ -260,8 +286,16 @@ func (p *Pipeline) routeOrder(order *domain.Order) string {
 	return ""
 }
 
-// router reads orders from the riskOut channel, determines the target venue,
-// persists the order as New, and forwards to the per-venue dispatch channel.
+// router reads orders from the riskOut channel, determines the target venue(s),
+// persists the order as New, and forwards to the per-venue dispatch channel(s).
+//
+// Phase 3 flow (when orderRouter and/or crossingEngine are injected):
+//  1. Try internal crossing first (crossingEngine.TryCross)
+//  2. If fully crossed: process fills directly, skip venue dispatch
+//  3. If partially crossed or not crossed: pass residual to router.Route()
+//  4. For each allocation: dispatch to the appropriate per-venue channel
+//
+// Falls back to legacy routeOrder() when no smart router is configured.
 func (p *Pipeline) router(ctx context.Context) {
 	defer p.wg.Done()
 	for {
@@ -273,48 +307,261 @@ func (p *Pipeline) router(ctx context.Context) {
 				return
 			}
 
-			venueID := p.routeOrder(order)
-			if venueID == "" {
-				p.logger.Error("no venue available for order",
-					slog.String("order_id", string(order.ID)),
-				)
-				_ = order.ApplyTransition(domain.OrderStatusRejected)
-				_ = p.store.UpdateOrder(ctx, order)
-				p.notifyOrderUpdate(ctx, order)
+			// If no smart router is configured, use legacy routing.
+			if p.orderRouter == nil {
+				p.routeLegacy(ctx, order)
 				continue
 			}
 
-			order.VenueID = venueID
+			p.routeSmart(ctx, order)
+		}
+	}
+}
 
+// routeLegacy dispatches an order using the Phase 2 asset-class-based routing.
+func (p *Pipeline) routeLegacy(ctx context.Context, order *domain.Order) {
+	venueID := p.routeOrder(order)
+	if venueID == "" {
+		p.logger.Error("no venue available for order",
+			slog.String("order_id", string(order.ID)),
+		)
+		_ = order.ApplyTransition(domain.OrderStatusRejected)
+		_ = p.store.UpdateOrder(ctx, order)
+		p.notifyOrderUpdate(ctx, order)
+		return
+	}
+
+	order.VenueID = venueID
+
+	if err := p.store.CreateOrder(ctx, order); err != nil {
+		p.logger.Error("failed to persist new order",
+			slog.String("order_id", string(order.ID)),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	p.logger.Info("order routed (legacy)",
+		slog.String("order_id", string(order.ID)),
+		slog.String("venue", order.VenueID),
+	)
+
+	p.dispatchToVenue(ctx, order, venueID)
+}
+
+// routeSmart implements the Phase 3 smart routing flow:
+// crossing -> router.Route() -> multi-venue dispatch.
+func (p *Pipeline) routeSmart(ctx context.Context, order *domain.Order) {
+	orderToRoute := order
+
+	// Step 1: Try internal crossing if engine is available.
+	if p.crossingEngine != nil {
+		result, err := p.crossingEngine.TryCross(order)
+		if err != nil {
+			p.logger.Warn("crossing engine error, proceeding to external routing",
+				slog.String("order_id", string(order.ID)),
+				slog.String("error", err.Error()),
+			)
+		} else if result.Crossed {
+			// TryCross mutates order.FilledQuantity in-place. We need to
+			// reset it so that ApplyFill (called from processFill) can
+			// correctly compute remaining quantity and update VWAP.
+			order.FilledQuantity = decimal.Zero
+
+			// Process crossing fills.
+			// First, persist the order so fills can be applied (order must be persisted and Acknowledged).
+			order.VenueID = "INTERNAL"
 			if err := p.store.CreateOrder(ctx, order); err != nil {
-				p.logger.Error("failed to persist new order",
+				p.logger.Error("failed to persist order for crossing",
 					slog.String("order_id", string(order.ID)),
+					slog.String("error", err.Error()),
+				)
+				return
+			}
+
+			// Transition to Acknowledged so fills can be applied.
+			if err := order.ApplyTransition(domain.OrderStatusAcknowledged); err != nil {
+				p.logger.Error("failed to transition order to acknowledged for crossing",
+					slog.String("order_id", string(order.ID)),
+					slog.String("error", err.Error()),
+				)
+				return
+			}
+			_ = p.store.UpdateOrder(ctx, order)
+
+			for _, fill := range result.Fills {
+				if fill.OrderID == order.ID {
+					p.processFill(ctx, fill)
+				}
+			}
+
+			p.logger.Info("order crossed internally",
+				slog.String("order_id", string(order.ID)),
+				slog.Int("fill_count", len(result.Fills)),
+			)
+
+			// If fully crossed (no residual), we are done.
+			if result.ResidualOrder == nil {
+				return
+			}
+
+			// Partially crossed: route the residual externally.
+			orderToRoute = result.ResidualOrder
+		}
+	}
+
+	// Step 2: Build venue candidates from registered venues.
+	candidates := p.buildVenueCandidates(orderToRoute)
+	if len(candidates) == 0 {
+		p.logger.Error("no venue candidates for order",
+			slog.String("order_id", string(orderToRoute.ID)),
+		)
+		_ = order.ApplyTransition(domain.OrderStatusRejected)
+		_ = p.store.UpdateOrder(ctx, order)
+		p.notifyOrderUpdate(ctx, order)
+		return
+	}
+
+	// Step 3: Determine strategy name.
+	strategyName := ""
+	if order.VenueID != "" && order.VenueID != "smart" && order.VenueID != "INTERNAL" {
+		strategyName = "venue-preference"
+	}
+
+	// Step 4: Route via the smart router.
+	decision, err := p.orderRouter.Route(ctx, orderToRoute, candidates, strategyName)
+	if err != nil {
+		p.logger.Error("smart router failed, falling back to legacy",
+			slog.String("order_id", string(order.ID)),
+			slog.String("error", err.Error()),
+		)
+		p.routeLegacy(ctx, order)
+		return
+	}
+
+	// Step 5: Persist the parent order if not already persisted (no crossing happened).
+	if orderToRoute == order {
+		if len(decision.Allocations) == 1 {
+			order.VenueID = decision.Allocations[0].VenueID
+		}
+		if err := p.store.CreateOrder(ctx, order); err != nil {
+			p.logger.Error("failed to persist new order",
+				slog.String("order_id", string(order.ID)),
+				slog.String("error", err.Error()),
+			)
+			return
+		}
+	}
+
+	// Step 6: Dispatch to venue(s).
+	if len(decision.Allocations) == 1 {
+		// Single venue: dispatch the order directly.
+		alloc := decision.Allocations[0]
+		order.VenueID = alloc.VenueID
+		_ = p.store.UpdateOrder(ctx, order)
+
+		p.logger.Info("order routed (smart)",
+			slog.String("order_id", string(order.ID)),
+			slog.String("venue", alloc.VenueID),
+			slog.String("strategy", decision.Strategy),
+		)
+
+		p.dispatchToVenue(ctx, order, alloc.VenueID)
+	} else {
+		// Multiple venues: create child orders for each allocation.
+		p.logger.Info("order split across venues",
+			slog.String("order_id", string(order.ID)),
+			slog.Int("venue_count", len(decision.Allocations)),
+			slog.String("strategy", decision.Strategy),
+		)
+
+		for _, alloc := range decision.Allocations {
+			child := p.createChildOrder(order, alloc)
+
+			// Track child in memory.
+			p.orderMu.Lock()
+			p.orderMap[child.ID] = child
+			p.orderMu.Unlock()
+
+			if err := p.store.CreateOrder(ctx, child); err != nil {
+				p.logger.Error("failed to persist child order",
+					slog.String("order_id", string(child.ID)),
+					slog.String("parent_id", string(order.ID)),
 					slog.String("error", err.Error()),
 				)
 				continue
 			}
 
-			p.logger.Info("order routed",
-				slog.String("order_id", string(order.ID)),
-				slog.String("venue", order.VenueID),
+			p.logger.Info("child order dispatched",
+				slog.String("child_id", string(child.ID)),
+				slog.String("parent_id", string(order.ID)),
+				slog.String("venue", alloc.VenueID),
+				slog.String("quantity", alloc.Quantity.String()),
 			)
 
-			ch, ok := p.dispatchCh[venueID]
-			if !ok {
-				p.logger.Error("no dispatch channel for venue",
-					slog.String("order_id", string(order.ID)),
-					slog.String("venue", venueID),
-				)
-				continue
-			}
-
-			select {
-			case ch <- venueOrder{order: order}:
-			case <-ctx.Done():
-				return
-			}
+			p.dispatchToVenue(ctx, child, alloc.VenueID)
 		}
 	}
+}
+
+// dispatchToVenue sends an order to the per-venue dispatch channel.
+func (p *Pipeline) dispatchToVenue(ctx context.Context, order *domain.Order, venueID string) {
+	ch, ok := p.dispatchCh[venueID]
+	if !ok {
+		p.logger.Error("no dispatch channel for venue",
+			slog.String("order_id", string(order.ID)),
+			slog.String("venue", venueID),
+		)
+		return
+	}
+
+	select {
+	case ch <- venueOrder{order: order}:
+	case <-ctx.Done():
+	}
+}
+
+// buildVenueCandidates creates stub VenueCandidates from registered venue adapters.
+// In the full P3-26 wiring, these will be populated with real market data from
+// the price comparator. For now, we use basic metadata with generous defaults.
+func (p *Pipeline) buildVenueCandidates(order *domain.Order) []router.VenueCandidate {
+	candidates := make([]router.VenueCandidate, 0, len(p.venues))
+	for _, v := range p.venues {
+		// Use the order price as a placeholder for bid/ask (no real market data yet).
+		price := order.Price
+		if price.IsZero() {
+			price = decimal.NewFromInt(1) // avoid zero-price issues for market orders
+		}
+		candidates = append(candidates, router.VenueCandidate{
+			VenueID:      v.VenueID(),
+			BidPrice:     price,
+			AskPrice:     price,
+			DepthAtPrice: order.Quantity, // assume full depth available
+			LatencyP50:   50 * time.Millisecond,
+			FillRate30d:  0.95,
+			FeeRate:      decimal.NewFromFloat(0.001),
+		})
+	}
+	return candidates
+}
+
+// createChildOrder creates a child order from a parent order and a venue allocation.
+func (p *Pipeline) createChildOrder(parent *domain.Order, alloc router.VenueAllocation) *domain.Order {
+	child := &domain.Order{
+		ID:            domain.OrderID(newUUID()),
+		ClientOrderID: fmt.Sprintf("%s-child-%s", parent.ClientOrderID, alloc.VenueID),
+		InstrumentID:  parent.InstrumentID,
+		Side:          parent.Side,
+		Type:          parent.Type,
+		Quantity:      alloc.Quantity,
+		Price:         parent.Price,
+		Status:        domain.OrderStatusNew,
+		VenueID:       alloc.VenueID,
+		AssetClass:    parent.AssetClass,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	return child
 }
 
 // venueDispatch calls venue.SubmitOrder, transitions the order to Acknowledged,

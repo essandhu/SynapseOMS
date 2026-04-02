@@ -9,8 +9,10 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/synapse-oms/gateway/internal/adapter"
+	"github.com/synapse-oms/gateway/internal/crossing"
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
+	"github.com/synapse-oms/gateway/internal/router"
 )
 
 // --- In-memory Store mock ---
@@ -292,9 +294,16 @@ func makeOrder() *domain.Order {
 	}
 }
 
+func makeDefaultRouter() *router.Router {
+	r := router.New()
+	r.Register(router.NewBestPriceStrategy())
+	return r
+}
+
 func makePipeline(store *memStore, venue *mockVenue, notifier *mockNotifier) *Pipeline {
 	risk := newMockRiskClient(true)
-	return NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk)
+	return NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithRouter(makeDefaultRouter()))
 }
 
 func waitFor(t *testing.T, timeout time.Duration, check func() bool, msg string) {
@@ -789,4 +798,165 @@ func TestNilRiskClientUsesFailOpen(t *testing.T) {
 		o := store.getOrder(order.ID)
 		return o != nil && o.Status == domain.OrderStatusAcknowledged
 	}, "order to be acknowledged with nil risk client")
+}
+
+// --- Phase 3: Smart Router Integration Tests ---
+
+func TestCrossingEngineInternalFill(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+	risk := newMockRiskClient(true)
+	ce := crossing.NewCrossingEngine()
+
+	// Add a resting sell order to the crossing book.
+	restingOrder := &domain.Order{
+		ID:             domain.OrderID("resting-sell-1"),
+		ClientOrderID:  "resting-1",
+		InstrumentID:   "AAPL",
+		Side:           domain.SideSell,
+		Type:           domain.OrderTypeLimit,
+		Quantity:       decimal.NewFromInt(100),
+		Price:          decimal.NewFromFloat(185.00),
+		FilledQuantity: decimal.Zero,
+		Status:         domain.OrderStatusAcknowledged,
+	}
+	ce.AddOrder(restingOrder)
+
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithRouter(makeDefaultRouter()),
+		WithCrossingEngine(ce))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	// Submit a buy order that should cross internally.
+	order := makeOrder()
+	order.Type = domain.OrderTypeLimit
+	order.Price = decimal.NewFromFloat(185.00)
+	order.Quantity = decimal.NewFromInt(100)
+
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// The order should be fully crossed internally -> Filled status.
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusFilled
+	}, "order to be fully crossed internally and filled")
+
+	// Verify a fill was persisted with INTERNAL venue.
+	waitFor(t, 2*time.Second, func() bool {
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		for _, f := range store.fills {
+			if f.OrderID == order.ID && f.VenueID == "INTERNAL" {
+				return true
+			}
+		}
+		return false
+	}, "internal fill to be persisted")
+
+	// Venue should NOT have received the order (fully crossed internally).
+	venue.mu.Lock()
+	venueOrders := len(venue.orders)
+	venue.mu.Unlock()
+	if venueOrders > 0 {
+		t.Fatalf("expected no orders dispatched to venue, got %d", venueOrders)
+	}
+}
+
+func TestSmartRouterSplitAcrossTwoVenues(t *testing.T) {
+	store := newMemStore()
+	notifier := newMockNotifier()
+	risk := newMockRiskClient(true)
+
+	venue1 := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "venue-a",
+		status:  adapter.Connected,
+	}
+	venue2 := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "venue-b",
+		status:  adapter.Connected,
+	}
+
+	venues := []adapter.LiquidityProvider{venue1, venue2}
+
+	// Create a custom router with a strategy that splits across both venues.
+	r := router.New()
+	r.Register(&splitStrategy{})
+
+	p := NewPipeline(store, venues, notifier, risk, WithRouter(r))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	order.Quantity = decimal.NewFromInt(200)
+
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// Both venues should receive a child order.
+	waitFor(t, 2*time.Second, func() bool {
+		venue1.mu.Lock()
+		n1 := len(venue1.orders)
+		venue1.mu.Unlock()
+		return n1 > 0
+	}, "venue-a to receive a child order")
+
+	waitFor(t, 2*time.Second, func() bool {
+		venue2.mu.Lock()
+		n2 := len(venue2.orders)
+		venue2.mu.Unlock()
+		return n2 > 0
+	}, "venue-b to receive a child order")
+
+	// Verify the quantities are correct (100 each).
+	venue1.mu.Lock()
+	v1Order := venue1.orders[0]
+	venue1.mu.Unlock()
+	venue2.mu.Lock()
+	v2Order := venue2.orders[0]
+	venue2.mu.Unlock()
+
+	if !v1Order.Quantity.Equal(decimal.NewFromInt(100)) {
+		t.Fatalf("expected venue-a child quantity 100, got %s", v1Order.Quantity)
+	}
+	if !v2Order.Quantity.Equal(decimal.NewFromInt(100)) {
+		t.Fatalf("expected venue-b child quantity 100, got %s", v2Order.Quantity)
+	}
+
+	// Verify parent order was persisted.
+	parentOrder := store.getOrder(order.ID)
+	if parentOrder == nil {
+		t.Fatal("expected parent order to be persisted")
+	}
+}
+
+// splitStrategy is a test routing strategy that always splits evenly across
+// the first two candidates.
+type splitStrategy struct{}
+
+func (s *splitStrategy) Name() string { return "split-test" }
+
+func (s *splitStrategy) Evaluate(
+	_ context.Context,
+	order *domain.Order,
+	candidates []router.VenueCandidate,
+) ([]router.VenueAllocation, error) {
+	if len(candidates) < 2 {
+		return []router.VenueAllocation{
+			{VenueID: candidates[0].VenueID, Quantity: order.Quantity, Reason: "only-one"},
+		}, nil
+	}
+	half := order.Quantity.Div(decimal.NewFromInt(2))
+	return []router.VenueAllocation{
+		{VenueID: candidates[0].VenueID, Quantity: half, Reason: "split-50/50"},
+		{VenueID: candidates[1].VenueID, Quantity: half, Reason: "split-50/50"},
+	}, nil
 }
