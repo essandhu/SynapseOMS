@@ -64,6 +64,11 @@ func (s *Server) HandleVenues(w http.ResponseWriter, r *http.Request) {
 	s.serveWS(w, r, StreamVenues)
 }
 
+// HandleAnomalies upgrades the connection for /ws/anomalies streaming.
+func (s *Server) HandleAnomalies(w http.ResponseWriter, r *http.Request) {
+	s.serveWS(w, r, StreamAnomalies)
+}
+
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, stream StreamType) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

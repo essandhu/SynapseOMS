@@ -4,6 +4,7 @@ import type {
   PositionUpdate,
   RiskUpdate,
   VenueStatusUpdate,
+  AnomalyAlert,
 } from "./types";
 
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
@@ -94,6 +95,29 @@ export function createVenueStream(
 }
 
 /**
+ * Creates a WebSocket connection for real-time anomaly alerts.
+ * Automatically reconnects on disconnect.
+ */
+export function createAnomalyStream(
+  onAlert: (alert: AnomalyAlert) => void,
+): ReconnectingWebSocket {
+  const ws = new ReconnectingWebSocket(`${BASE_WS}/ws/anomalies`);
+
+  ws.addEventListener("message", (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data as string);
+      if (data.type === "anomaly_alert" && data.data) {
+        onAlert(data.data as AnomalyAlert);
+      }
+    } catch {
+      console.error("[ws:anomalies] Failed to parse message");
+    }
+  });
+
+  return ws;
+}
+
+/**
  * Initialize all WebSocket streams and return a cleanup function.
  * Connects order, position, risk, and venue streams simultaneously.
  */
@@ -102,13 +126,18 @@ export function initializeStreams(handlers: {
   onPositionUpdate: (update: PositionUpdate) => void;
   onRiskUpdate: (update: RiskUpdate) => void;
   onVenueUpdate: (update: VenueStatusUpdate) => void;
+  onAnomalyAlert?: (alert: AnomalyAlert) => void;
 }): () => void {
-  const streams = [
+  const streams: ReconnectingWebSocket[] = [
     createOrderStream(handlers.onOrderUpdate),
     createPositionStream(handlers.onPositionUpdate),
     createRiskStream(handlers.onRiskUpdate),
     createVenueStream(handlers.onVenueUpdate),
   ];
+
+  if (handlers.onAnomalyAlert) {
+    streams.push(createAnomalyStream(handlers.onAnomalyAlert));
+  }
 
   return () => {
     for (const ws of streams) {

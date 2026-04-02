@@ -6,8 +6,11 @@ import { BlotterView } from "./views/BlotterView";
 import { RiskDashboard } from "./views/RiskDashboard";
 import { LiquidityNetwork } from "./views/LiquidityNetwork";
 import { OptimizerView } from "./views/OptimizerView";
+import { InsightsPanel } from "./views/InsightsPanel";
 import { OnboardingView } from "./views/OnboardingView";
 import { fetchVenues } from "./api/rest";
+import { initializeStreams } from "./api/ws";
+import { useInsightStore } from "./stores/insightStore";
 
 function AppRoutes() {
   const [checking, setChecking] = useState(true);
@@ -63,6 +66,7 @@ function AppRoutes() {
         <Route path="risk" element={<RiskDashboard />} />
         <Route path="venues" element={<LiquidityNetwork />} />
         <Route path="optimizer" element={<OptimizerView />} />
+        <Route path="insights" element={<InsightsPanel />} />
       </Route>
       {needsOnboarding && (
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
@@ -72,6 +76,19 @@ function AppRoutes() {
 }
 
 export function App() {
+  const { applyAnomalyAlert } = useInsightStore();
+
+  useEffect(() => {
+    const cleanup = initializeStreams({
+      onOrderUpdate: () => {},
+      onPositionUpdate: () => {},
+      onRiskUpdate: () => {},
+      onVenueUpdate: () => {},
+      onAnomalyAlert: applyAnomalyAlert,
+    });
+    return cleanup;
+  }, [applyAnomalyAlert]);
+
   return (
     <BrowserRouter>
       <AppRoutes />

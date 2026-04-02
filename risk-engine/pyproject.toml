@@ -23,6 +23,7 @@ dependencies = [
     "protobuf>=5.27",
     "prometheus-client>=0.20",
     "structlog>=24.2",
+    "anthropic>=0.40,<1",
 ]
 
 [project.optional-dependencies]

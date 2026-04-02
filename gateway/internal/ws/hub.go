@@ -21,6 +21,7 @@ const (
 	StreamOrders    StreamType = "orders"
 	StreamPositions StreamType = "positions"
 	StreamVenues    StreamType = "venues"
+	StreamAnomalies StreamType = "anomalies"
 )
 
 // Message is the JSON envelope sent to WebSocket clients.
@@ -76,6 +77,32 @@ type venueData struct {
 	Status    string    `json:"status"`
 	LatencyMs int64     `json:"latencyMs"`
 	Timestamp time.Time `json:"timestamp"`
+}
+
+// AnomalyAlertEvent represents an anomaly alert for broadcasting.
+type AnomalyAlertEvent struct {
+	ID           string
+	InstrumentID string
+	VenueID      string
+	AnomalyScore float64
+	Severity     string
+	Features     map[string]float64
+	Description  string
+	Timestamp    time.Time
+	Acknowledged bool
+}
+
+// anomalyData is the JSON representation of an anomaly alert.
+type anomalyData struct {
+	ID           string             `json:"id"`
+	InstrumentID string             `json:"instrument_id"`
+	VenueID      string             `json:"venue_id"`
+	AnomalyScore float64            `json:"anomaly_score"`
+	Severity     string             `json:"severity"`
+	Features     map[string]float64 `json:"features"`
+	Description  string             `json:"description"`
+	Timestamp    time.Time          `json:"timestamp"`
+	Acknowledged bool               `json:"acknowledged"`
 }
 
 // client represents a connected WebSocket client.
@@ -298,6 +325,32 @@ func (h *Hub) NotifyVenueStatus(event VenueStatusEvent) {
 	}
 
 	h.broadcast(StreamVenues, data)
+}
+
+// NotifyAnomalyAlert broadcasts an anomaly alert to all /ws/anomalies clients.
+func (h *Hub) NotifyAnomalyAlert(event AnomalyAlertEvent) {
+	msg := Message{
+		Type: "anomaly_alert",
+		Data: anomalyData{
+			ID:           event.ID,
+			InstrumentID: event.InstrumentID,
+			VenueID:      event.VenueID,
+			AnomalyScore: event.AnomalyScore,
+			Severity:     event.Severity,
+			Features:     event.Features,
+			Description:  event.Description,
+			Timestamp:    event.Timestamp,
+			Acknowledged: event.Acknowledged,
+		},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		h.logger.Error("failed to marshal anomaly alert", slog.String("error", err.Error()))
+		return
+	}
+
+	h.broadcast(StreamAnomalies, data)
 }
 
 // --- string helpers ---

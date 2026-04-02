@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router";
+import { useInsightStore } from "../stores/insightStore";
 
 const NAV_TABS = [
   { label: "Blotter", to: "/" },
@@ -6,9 +7,12 @@ const NAV_TABS = [
   { label: "Risk", to: "/risk" },
   { label: "Venues", to: "/venues" },
   { label: "Optimizer", to: "/optimizer" },
+  { label: "Insights", to: "/insights" },
 ] as const;
 
 export function TerminalLayout() {
+  const alertCount = useInsightStore((s) => s.unacknowledgedCount());
+
   return (
     <div className="relative flex h-screen flex-col bg-bg-primary font-sans text-text-primary">
       {/* Scanline overlay */}
@@ -41,6 +45,14 @@ export function TerminalLayout() {
               }
             >
               {tab.label}
+              {tab.to === "/insights" && alertCount > 0 && (
+                <span
+                  className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                  data-testid="nav-alert-badge"
+                >
+                  {alertCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

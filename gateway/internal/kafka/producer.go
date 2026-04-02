@@ -12,11 +12,12 @@ import (
 	"github.com/synapse-oms/gateway/internal/logging"
 )
 
-// Topic constants for the three event streams.
+// Topic constants for the event streams.
 const (
 	TopicOrderLifecycle = "order-lifecycle"
 	TopicMarketData     = "market-data"
 	TopicVenueStatus    = "venue-status"
+	TopicAnomalyAlerts  = "anomaly-alerts"
 )
 
 // Header key used to propagate correlation IDs across Kafka messages.
