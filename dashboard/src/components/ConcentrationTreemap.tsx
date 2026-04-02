@@ -134,7 +134,7 @@ export function ConcentrationTreemap({
       .round(true);
 
     layout(root);
-    return root.leaves() as d3.HierarchyRectangularNode<TreemapNode & { value: number }>[];
+    return root.leaves() as unknown as d3.HierarchyRectangularNode<TreemapNode & { value: number }>[];
   }, [nodes, dimensions]);
 
   if (
