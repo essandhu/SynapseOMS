@@ -65,7 +65,7 @@ def test_prompt_is_formatted_correctly(mock_anthropic: MagicMock) -> None:
     ctx = _make_trade_context()
 
     import asyncio
-    asyncio.get_event_loop().run_until_complete(analyst.analyze_execution(ctx))
+    asyncio.run(analyst.analyze_execution(ctx))
 
     call_kwargs = mock_client.messages.create.call_args
     prompt_text = call_kwargs.kwargs["messages"][0]["content"]
@@ -91,9 +91,7 @@ def test_successful_response_parsing(mock_anthropic: MagicMock) -> None:
     ctx = _make_trade_context()
 
     import asyncio
-    report = asyncio.get_event_loop().run_until_complete(
-        analyst.analyze_execution(ctx)
-    )
+    report = asyncio.run(analyst.analyze_execution(ctx))
 
     assert isinstance(report, ExecutionReport)
     assert report.overall_grade == "B"
@@ -119,9 +117,7 @@ def test_json_parse_error_returns_fallback(mock_anthropic: MagicMock) -> None:
     ctx = _make_trade_context()
 
     import asyncio
-    report = asyncio.get_event_loop().run_until_complete(
-        analyst.analyze_execution(ctx)
-    )
+    report = asyncio.run(analyst.analyze_execution(ctx))
 
     assert report.overall_grade == "N/A"
     assert report.implementation_shortfall_bps == 0.0
@@ -148,10 +144,10 @@ def test_rate_limiting_enforced(mock_anthropic: MagicMock) -> None:
     import asyncio
 
     for _ in range(10):
-        asyncio.get_event_loop().run_until_complete(analyst.analyze_execution(ctx))
+        asyncio.run(analyst.analyze_execution(ctx))
 
     with pytest.raises(RateLimitExceeded):
-        asyncio.get_event_loop().run_until_complete(analyst.analyze_execution(ctx))
+        asyncio.run(analyst.analyze_execution(ctx))
 
 
 @patch("ai.execution_analyst.analyst.anthropic")
@@ -175,9 +171,7 @@ def test_rate_limit_resets_after_hour(mock_anthropic: MagicMock) -> None:
     ctx = _make_trade_context()
 
     import asyncio
-    report = asyncio.get_event_loop().run_until_complete(
-        analyst.analyze_execution(ctx)
-    )
+    report = asyncio.run(analyst.analyze_execution(ctx))
 
     # Should succeed since old timestamps are pruned
     assert report.overall_grade == "B"
