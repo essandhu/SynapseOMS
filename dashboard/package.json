@@ -11,8 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
     "ag-grid-community": "^32.0.0",
     "ag-grid-react": "^32.0.0",
+    "d3": "^7.9.0",
     "ky": "^1.0.0",
     "lucide-react": "latest",
     "react": "^19.0.0",

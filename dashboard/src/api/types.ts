@@ -186,6 +186,22 @@ export interface TradeAction {
   estimatedCost: string;
 }
 
+/** Individual Greeks for an instrument or portfolio total */
+export interface Greeks {
+  delta: number;
+  gamma: number;
+  vega: number;
+  theta: number;
+  rho: number;
+}
+
+/** Portfolio-level Greeks with per-instrument breakdown */
+export interface PortfolioGreeks {
+  total: Greeks;
+  byInstrument: Record<string, Greeks>;
+  computedAt: string;
+}
+
 /** WebSocket update envelope for venue status changes */
 export interface VenueStatusUpdate {
   type: "venue_connected" | "venue_disconnected" | "venue_degraded";
