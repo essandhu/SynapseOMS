@@ -262,6 +262,30 @@ func main() {
 	logger.Info("WebSocket hub ready")
 
 	// -------------------------------------------------------
+	// 10b. Initialize anomaly alert consumer (Kafka -> WebSocket relay)
+	// -------------------------------------------------------
+	var anomalyConsumer *kafka.AnomalyConsumer
+	if kafkaBrokers != "" {
+		logger.Info("initializing anomaly alert consumer")
+		anomalyConsumer = kafka.NewAnomalyConsumer(kafkaBrokers, func(alert kafka.AnomalyAlert) {
+			hub.NotifyAnomalyAlert(ws.AnomalyAlertEvent{
+				ID:           alert.ID,
+				InstrumentID: alert.InstrumentID,
+				VenueID:      alert.VenueID,
+				AnomalyScore: alert.AnomalyScore,
+				Severity:     alert.Severity,
+				Features:     alert.Features,
+				Description:  alert.Description,
+				Timestamp:    alert.Timestamp,
+				Acknowledged: alert.Acknowledged,
+			})
+		})
+		anomalyConsumer.Start(ctx)
+		defer anomalyConsumer.Stop()
+		logger.Info("anomaly alert consumer started")
+	}
+
+	// -------------------------------------------------------
 	// 11a. Initialize smart order router
 	// -------------------------------------------------------
 	logger.Info("initializing smart order router")
@@ -327,6 +351,7 @@ func main() {
 	mux.HandleFunc("/ws/orders", wsSrv.HandleOrders)
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
 	mux.HandleFunc("/ws/venues", wsSrv.HandleVenues)
+	mux.HandleFunc("/ws/anomalies", wsSrv.HandleAnomalies)
 
 	// -------------------------------------------------------
 	// 14. Start HTTP server
@@ -361,6 +386,7 @@ func main() {
 		slog.Bool("risk_engine_configured", riskEngineAddr != ""),
 		slog.Bool("redis_connected", redisClient != nil),
 		slog.Bool("credential_mgr_enabled", credMgr != nil),
+		slog.Bool("anomaly_consumer_enabled", anomalyConsumer != nil),
 	)
 
 	// -------------------------------------------------------
