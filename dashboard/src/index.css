@@ -26,8 +26,19 @@
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
+html,
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+}
+
+/* Status bar pulsing connection dot — 2s ease-in-out per spec */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 2s ease-in-out infinite;
 }
