@@ -292,6 +292,7 @@ func main() {
 	mux.Handle("/", router)
 	mux.HandleFunc("/ws/orders", wsSrv.HandleOrders)
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
+	mux.HandleFunc("/ws/venues", wsSrv.HandleVenues)
 
 	// -------------------------------------------------------
 	// 14. Start HTTP server
