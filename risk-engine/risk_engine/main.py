@@ -12,8 +12,14 @@ from __future__ import annotations
 
 import os
 import signal
+import sys
 import uuid
 from contextlib import asynccontextmanager
+
+# Make ai/ package importable (lives at repo root, not inside risk-engine)
+_REPO_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 from decimal import Decimal
 from typing import AsyncIterator
 
@@ -42,6 +48,18 @@ from risk_engine.settlement.tracker import SettlementTracker
 from risk_engine.var.historical import HistoricalVaR
 from risk_engine.var.monte_carlo import MonteCarloVaR
 from risk_engine.var.parametric import ParametricVaR
+from risk_engine.anomaly.detector import StreamingAnomalyDetector
+from risk_engine.anomaly.consumer import AnomalyAlertPipeline
+from risk_engine.rest.router_anomaly import (
+    AnomalyDependencies,
+    configure_dependencies as configure_anomaly_dependencies,
+    router as anomaly_router,
+)
+from risk_engine.rest.router_ai import (
+    AIDependencies,
+    configure_dependencies as configure_ai_dependencies,
+    router as ai_router,
+)
 
 # ---------------------------------------------------------------------------
 # Structlog configuration — JSON output with correlation-ID support
@@ -72,6 +90,7 @@ KAFKA_BROKERS = os.getenv("KAFKA_BROKERS", "localhost:9092")
 GRPC_PORT = int(os.getenv("GRPC_PORT", "50051"))
 POSTGRES_URL = os.getenv("POSTGRES_URL", "")
 REDIS_URL = os.getenv("REDIS_URL", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Shared state — single instances used by all three subsystems
@@ -88,6 +107,7 @@ concentration_analyzer = ConcentrationAnalyzer(
     asset_class_threshold=0.50,
 )
 greeks_calculator = GreeksCalculator()
+anomaly_detector = StreamingAnomalyDetector()
 
 # ---------------------------------------------------------------------------
 # Subsystem references (set during startup, used for health checks & shutdown)
@@ -95,6 +115,7 @@ greeks_calculator = GreeksCalculator()
 
 kafka_consumer: PortfolioStateBuilder | None = None
 grpc_server = None
+anomaly_pipeline: AnomalyAlertPipeline | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +146,7 @@ def _on_fill_callback(fill: dict) -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan handler: start and stop all subsystems."""
-    global kafka_consumer, grpc_server  # noqa: PLW0603
+    global kafka_consumer, grpc_server, anomaly_pipeline  # noqa: PLW0603
 
     logger.info("starting_risk_engine", version="0.1.0")
 
@@ -149,6 +170,33 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         covariance_matrix=np.array([]).reshape(0, 0),
     )
     configure_optimizer_dependencies(optimizer_deps)
+
+    # 1c. Configure anomaly dependencies ------------------------------------
+    anomaly_pipeline = AnomalyAlertPipeline(
+        detector=anomaly_detector,
+        kafka_brokers=KAFKA_BROKERS,
+    )
+    anomaly_deps = AnomalyDependencies(alert_pipeline=anomaly_pipeline)
+    configure_anomaly_dependencies(anomaly_deps)
+    anomaly_pipeline.start()
+
+    # 1d. Configure AI dependencies (optional — graceful without API key) ---
+    ai_deps_kwargs: dict = {
+        "optimizer": portfolio_optimizer,
+        "portfolio": portfolio,
+        "expected_returns": np.array([]),
+        "covariance_matrix": np.array([]).reshape(0, 0),
+    }
+    if ANTHROPIC_API_KEY:
+        from ai.execution_analyst.analyst import ExecutionAnalyst
+        from ai.rebalancing_assistant.assistant import RebalancingAssistant
+        ai_deps_kwargs["execution_analyst"] = ExecutionAnalyst()
+        ai_deps_kwargs["rebalancing_assistant"] = RebalancingAssistant()
+        logger.info("ai_modules_enabled")
+    else:
+        logger.info("ai_modules_disabled", reason="ANTHROPIC_API_KEY not set")
+    ai_deps = AIDependencies(**ai_deps_kwargs)
+    configure_ai_dependencies(ai_deps)
 
     # 2. Start Kafka consumer (background thread) ---------------------------
     kafka_consumer = PortfolioStateBuilder(
@@ -180,6 +228,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     if kafka_consumer:
         kafka_consumer.stop()
+
+    if anomaly_pipeline:
+        anomaly_pipeline.stop()
 
     if grpc_server:
         grpc_server.stop(grace=5)
@@ -238,6 +289,8 @@ app.add_middleware(
 
 app.include_router(risk_router)
 app.include_router(optimizer_router)
+app.include_router(anomaly_router)
+app.include_router(ai_router)
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +314,9 @@ async def health() -> dict:
         "portfolio_optimizer": "ok" if portfolio_optimizer else "not_configured",
         "concentration_analyzer": "ok" if concentration_analyzer else "not_configured",
         "greeks_calculator": "ok" if greeks_calculator else "not_configured",
+        "anomaly_detector": "ok" if anomaly_pipeline and anomaly_pipeline._running else "not_started",
+        "ai_execution_analyst": "ok" if ANTHROPIC_API_KEY else "not_configured",
+        "ai_rebalancing_assistant": "ok" if ANTHROPIC_API_KEY else "not_configured",
     }
 
 
