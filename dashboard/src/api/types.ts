@@ -218,3 +218,57 @@ export interface VenueStatusUpdate {
   status: string;
   latencyMs?: number;
 }
+
+/** AI execution quality report */
+export interface ExecutionReport {
+  overallGrade: string;
+  implementationShortfallBps: number;
+  summary: string;
+  venueAnalysis: { venue: string; grade: string; comment: string }[];
+  recommendations: string[];
+  marketImpactEstimateBps: number;
+  orderId: string;
+  analyzedAt: string;
+}
+
+/** Market data anomaly alert */
+export interface AnomalyAlert {
+  id: string;
+  instrumentId: string;
+  venueId: string;
+  anomalyScore: number;
+  severity: "info" | "warning" | "critical";
+  features: Record<string, number>;
+  description: string;
+  timestamp: string;
+  acknowledged: boolean;
+}
+
+/** Constraints extracted by AI from natural language */
+export interface ExtractedConstraints {
+  objective: string;
+  targetReturn: number | null;
+  riskAversion: number;
+  longOnly: boolean;
+  maxSingleWeight: number | null;
+  assetClassBounds: Record<string, [number, number]> | null;
+  sectorLimits: Record<string, number> | null;
+  targetVolatility: number | null;
+  maxTurnoverUsd: number | null;
+  instrumentsToInclude: string[] | null;
+  instrumentsToExclude: string[] | null;
+  reasoning: string;
+}
+
+/** Result from AI rebalancing endpoint */
+export interface RebalanceResult {
+  constraints: ExtractedConstraints;
+  optimization: OptimizationResult;
+  reasoning: string;
+}
+
+/** WebSocket update for anomaly alerts */
+export interface AnomalyAlertUpdate {
+  type: "anomaly_alert";
+  alert: AnomalyAlert;
+}
