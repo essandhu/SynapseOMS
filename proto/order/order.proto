@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package synapse.order;
+
+option go_package = "github.com/synapse-oms/proto/order;orderpb";
+
+import "google/protobuf/timestamp.proto";
+import "instrument/instrument.proto";
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  ORDER_SIDE_BUY         = 1;
+  ORDER_SIDE_SELL        = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_MARKET      = 1;
+  ORDER_TYPE_LIMIT       = 2;
+  ORDER_TYPE_STOP_LIMIT  = 3;
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED       = 0;
+  ORDER_STATUS_NEW               = 1;
+  ORDER_STATUS_ACKNOWLEDGED      = 2;  // Venue accepted
+  ORDER_STATUS_PARTIALLY_FILLED  = 3;  // Some fills received
+  ORDER_STATUS_FILLED            = 4;  // Fully filled
+  ORDER_STATUS_CANCELED          = 5;  // User-initiated cancel confirmed
+  ORDER_STATUS_REJECTED          = 6;  // Venue or risk check rejected
+}
+
+enum FeeModel {
+  FEE_MODEL_UNSPECIFIED = 0;
+  FEE_MODEL_MAKER_TAKER = 1;
+  FEE_MODEL_COMMISSION  = 2;
+  FEE_MODEL_FLAT        = 3;
+}
+
+enum LiquidityType {
+  LIQUIDITY_TYPE_UNSPECIFIED = 0;
+  LIQUIDITY_TYPE_MAKER      = 1;
+  LIQUIDITY_TYPE_TAKER      = 2;
+  LIQUIDITY_TYPE_INTERNAL   = 3;  // Crossing
+}
+
+// ─── Messages ───────────────────────────────────────────────────────
+
+message Order {
+  string id                                       = 1;
+  string client_order_id                          = 2;   // User-supplied idempotency key
+  string instrument_id                            = 3;   // e.g., "AAPL", "ETH-USD"
+  OrderSide side                                  = 4;
+  OrderType type                                  = 5;
+  string quantity                                 = 6;   // decimal string — total order quantity
+  string price                                    = 7;   // decimal string — limit price (zero for market)
+  string filled_quantity                          = 8;   // decimal string
+  string average_price                            = 9;   // decimal string — VWAP fill price
+  OrderStatus status                              = 10;
+  string venue_id                                 = 11;
+  synapse.instrument.AssetClass asset_class       = 12;
+  synapse.instrument.SettlementCycle settlement_cycle = 13;
+  google.protobuf.Timestamp created_at            = 14;
+  google.protobuf.Timestamp updated_at            = 15;
+  repeated Fill fills                             = 16;
+}
+
+message Fill {
+  string id             = 1;
+  string order_id       = 2;
+  string venue_id       = 3;
+  string quantity       = 4;   // decimal string
+  string price          = 5;   // decimal string
+  string fee            = 6;   // decimal string
+  string fee_asset      = 7;   // USD, BTC, etc.
+  FeeModel fee_model    = 8;
+  LiquidityType liquidity = 9;
+  google.protobuf.Timestamp timestamp = 10;
+  string venue_exec_id  = 11;  // Venue's execution ID
+}
+
+// ─── Request / Response ─────────────────────────────────────────────
+
+message OrderRequest {
+  string client_order_id                          = 1;
+  string instrument_id                            = 2;
+  OrderSide side                                  = 3;
+  OrderType type                                  = 4;
+  string quantity                                 = 5;   // decimal string
+  string price                                    = 6;   // decimal string
+  string venue_id                                 = 7;
+  synapse.instrument.AssetClass asset_class       = 8;
+  synapse.instrument.SettlementCycle settlement_cycle = 9;
+}
+
+message ExecutionReport {
+  string order_id                = 1;
+  OrderStatus status             = 2;
+  string filled_quantity         = 3;   // decimal string — cumulative
+  string average_price           = 4;   // decimal string — cumulative VWAP
+  string reject_reason           = 5;   // Empty unless rejected
+  Fill latest_fill               = 6;   // Present on PartiallyFilled / Filled
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// ─── Order Lifecycle Events (Kafka) ─────────────────────────────────
+
+message OrderLifecycleEvent {
+  string event_id                     = 1;
+  string order_id                     = 2;
+  OrderStatus previous_status         = 3;
+  OrderStatus new_status              = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  oneof payload {
+    OrderCreated order_created        = 6;
+    OrderAcknowledged order_acknowledged = 7;
+    FillReceived fill_received        = 8;
+    OrderCanceled order_canceled      = 9;
+    OrderRejected order_rejected      = 10;
+  }
+}
+
+message OrderCreated {
+  Order order = 1;
+}
+
+message OrderAcknowledged {
+  string venue_order_id = 1;
+}
+
+message FillReceived {
+  Fill fill = 1;
+}
+
+message OrderCanceled {
+  string reason = 1;
+}
+
+message OrderRejected {
+  string reason = 1;
+}

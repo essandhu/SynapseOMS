@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package synapse.instrument;
+
+option go_package = "github.com/synapse-oms/proto/instrument;instrumentpb";
+
+import "google/protobuf/timestamp.proto";
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+enum AssetClass {
+  ASSET_CLASS_UNSPECIFIED          = 0;
+  ASSET_CLASS_EQUITY               = 1;
+  ASSET_CLASS_CRYPTO               = 2;
+  ASSET_CLASS_TOKENIZED_SECURITY   = 3;
+  ASSET_CLASS_FUTURE               = 4;
+  ASSET_CLASS_OPTION               = 5;
+}
+
+enum SettlementCycle {
+  SETTLEMENT_CYCLE_UNSPECIFIED = 0;
+  SETTLEMENT_CYCLE_T0         = 1;  // Crypto, tokenized
+  SETTLEMENT_CYCLE_T1         = 2;  // Some markets
+  SETTLEMENT_CYCLE_T2         = 3;  // US equities
+}
+
+// ─── Messages ───────────────────────────────────────────────────────
+
+message TradingSchedule {
+  bool is_24x7       = 1;
+  string market_open  = 2;  // "09:30" ET
+  string market_close = 3;  // "16:00" ET
+  string pre_market   = 4;  // "04:00" ET
+  string after_hours  = 5;  // "20:00" ET
+  string timezone     = 6;  // "America/New_York"
+}
+
+message Instrument {
+  string id                      = 1;   // "AAPL", "ETH-USD", "TSLA-2026-06-19-C-200"
+  string symbol                  = 2;   // Display symbol
+  string name                    = 3;
+  AssetClass asset_class         = 4;
+  string quote_currency          = 5;   // USD, USDT, BTC
+  string base_currency           = 6;   // For crypto pairs
+  string tick_size               = 7;   // decimal string — minimum price increment
+  string lot_size                = 8;   // decimal string — minimum quantity increment
+  SettlementCycle settlement_cycle = 9;
+  TradingSchedule trading_hours  = 10;
+  repeated string venues         = 11;  // Venue IDs where this instrument trades
+  string margin_required         = 12;  // decimal string — initial margin requirement
+}

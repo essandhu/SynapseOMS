@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package synapse.venue;
+
+option go_package = "github.com/synapse-oms/proto/venue;venuepb";
+
+import "google/protobuf/timestamp.proto";
+import "instrument/instrument.proto";
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+enum VenueStatus {
+  VENUE_STATUS_UNSPECIFIED     = 0;
+  VENUE_STATUS_CONNECTED       = 1;
+  VENUE_STATUS_DISCONNECTED    = 2;
+  VENUE_STATUS_DEGRADED        = 3;
+  VENUE_STATUS_AUTHENTICATION  = 4;  // Credentials invalid
+}
+
+enum VenueType {
+  VENUE_TYPE_UNSPECIFIED = 0;
+  VENUE_TYPE_EXCHANGE    = 1;
+  VENUE_TYPE_DARK_POOL   = 2;
+  VENUE_TYPE_SIMULATED   = 3;
+  VENUE_TYPE_TOKENIZED   = 4;
+}
+
+// ─── Messages ───────────────────────────────────────────────────────
+
+message VenueCapabilities {
+  bool supports_market_orders = 1;
+  bool supports_limit_orders  = 2;
+  bool supports_streaming     = 3;
+  int32 max_orders_per_second = 4;
+}
+
+message LiquidityVenue {
+  string id                                       = 1;
+  string name                                     = 2;
+  VenueType type                                  = 3;
+  VenueStatus status                              = 4;
+  repeated synapse.instrument.AssetClass supported_assets = 5;
+  int64 latency_p50_us                            = 6;   // microseconds
+  int64 latency_p99_us                            = 7;   // microseconds
+  double fill_rate                                = 8;   // 0.0–1.0
+  google.protobuf.Timestamp last_heartbeat        = 9;
+  VenueCapabilities capabilities                  = 10;
+}

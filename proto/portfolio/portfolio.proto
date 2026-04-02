@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package synapse.portfolio;
+
+option go_package = "github.com/synapse-oms/proto/portfolio;portfoliopb";
+
+import "google/protobuf/timestamp.proto";
+import "instrument/instrument.proto";
+
+// ─── Messages ───────────────────────────────────────────────────────
+
+message Position {
+  string instrument_id       = 1;
+  string venue_id            = 2;
+  string quantity            = 3;   // decimal string — signed: positive=long, negative=short
+  string average_cost        = 4;   // decimal string
+  string market_price        = 5;   // decimal string — latest market price
+  string unrealized_pnl      = 6;   // decimal string
+  string realized_pnl        = 7;   // decimal string
+  string unsettled_quantity   = 8;   // decimal string — for T+2 equities
+  string settled_quantity    = 9;   // decimal string
+  synapse.instrument.AssetClass asset_class = 10;
+  string quote_currency      = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message Portfolio {
+  map<string, Position> positions = 1;  // instrument_id → Position
+  string total_nav              = 2;    // decimal string — Net Asset Value in USD
+  string cash_balance           = 3;    // decimal string
+  string unsettled_cash         = 4;    // decimal string — cash tied up in settlements
+  string available_cash         = 5;    // decimal string — cash_balance - unsettled_cash
+  google.protobuf.Timestamp last_updated = 6;
+}
+
+// ─── Exposure Breakdown ─────────────────────────────────────────────
+
+message ExposureBreakdown {
+  map<string, string> by_asset_class = 1;  // asset_class → exposure (decimal string)
+  map<string, string> by_venue       = 2;  // venue_id → exposure (decimal string)
+  map<string, string> by_sector      = 3;  // sector → exposure (decimal string)
+}

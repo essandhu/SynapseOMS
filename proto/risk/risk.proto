@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package synapse.risk;
+
+option go_package = "github.com/synapse-oms/proto/risk;riskpb";
+
+// ─── Service ────────────────────────────────────────────────────────
+
+// Synchronous pre-trade risk check — called by Order Gateway before routing
+service RiskGate {
+  rpc CheckPreTradeRisk(PreTradeRiskRequest) returns (PreTradeRiskResponse);
+}
+
+// ─── Request / Response ─────────────────────────────────────────────
+
+message PreTradeRiskRequest {
+  string order_id       = 1;
+  string instrument_id  = 2;
+  string side           = 3;  // BUY, SELL
+  string quantity       = 4;  // decimal string
+  string price          = 5;  // decimal string (0 for market)
+  string asset_class    = 6;
+  string venue_id       = 7;
+}
+
+message PreTradeRiskResponse {
+  bool approved                  = 1;
+  string reject_reason           = 2;  // Empty if approved
+  repeated RiskCheck checks      = 3;
+  string portfolio_var_before    = 4;  // decimal string
+  string portfolio_var_after     = 5;  // decimal string — projected VaR if order fills
+  int64 computed_at_ms           = 6;
+  string order_id                = 7;
+  string concentration_warning   = 8;  // Empty if no warning
+  string max_loss_estimate       = 9;  // decimal string
+}
+
+message RiskCheck {
+  string name      = 1;
+  bool passed      = 2;
+  string message   = 3;
+  string threshold = 4;  // decimal string
+  string actual    = 5;  // decimal string
+}
+
+// ─── VaR Metrics ────────────────────────────────────────────────────
+
+message VaRMetrics {
+  string var_95           = 1;  // decimal string — 95th percentile VaR
+  string var_99           = 2;  // decimal string — 99th percentile VaR
+  string expected_shortfall = 3;  // decimal string — conditional VaR
+  string method           = 4;  // "historical", "parametric", "monte_carlo"
+  int32 horizon_days      = 5;
+}
+
+// ─── Greeks ─────────────────────────────────────────────────────────
+
+message Greeks {
+  string delta = 1;  // decimal string
+  string gamma = 2;  // decimal string
+  string vega  = 3;  // decimal string
+  string theta = 4;  // decimal string
+  string rho   = 5;  // decimal string
+}
+
+// ─── Concentration Metrics ──────────────────────────────────────────
+
+message ConcentrationMetrics {
+  map<string, string> by_instrument = 1;  // instrument_id → % of NAV (decimal string)
+  map<string, string> by_asset_class = 2; // asset_class → % of NAV
+  map<string, string> by_venue       = 3; // venue_id → % of NAV
+  map<string, string> by_sector      = 4; // sector → % of NAV
+  string hhi                         = 5; // Herfindahl-Hirschman Index (decimal string)
+}

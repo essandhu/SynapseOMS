@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package synapse.marketdata;
+
+option go_package = "github.com/synapse-oms/proto/marketdata;marketdatapb";
+
+import "google/protobuf/timestamp.proto";
+
+// ─── Messages ───────────────────────────────────────────────────────
+
+message MarketDataSnapshot {
+  string instrument_id              = 1;
+  string venue_id                   = 2;
+  string bid_price                  = 3;   // decimal string
+  string ask_price                  = 4;   // decimal string
+  string bid_size                   = 5;   // decimal string
+  string ask_size                   = 6;   // decimal string
+  string last_price                 = 7;   // decimal string
+  string volume_24h                 = 8;   // decimal string
+  string vwap                       = 9;   // decimal string
+  google.protobuf.Timestamp timestamp = 10;
+}
+
+message OHLCV {
+  string instrument_id              = 1;
+  string open                       = 2;   // decimal string
+  string high                       = 3;   // decimal string
+  string low                        = 4;   // decimal string
+  string close                      = 5;   // decimal string
+  string volume                     = 6;   // decimal string
+  google.protobuf.Timestamp period_start = 7;
+  google.protobuf.Timestamp period_end   = 8;
+}
+
+message OrderBookLevel {
+  string price    = 1;  // decimal string
+  string quantity = 2;  // decimal string
+  int32 order_count = 3;
+}
+
+message OrderBook {
+  string instrument_id          = 1;
+  string venue_id               = 2;
+  repeated OrderBookLevel bids  = 3;
+  repeated OrderBookLevel asks  = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
