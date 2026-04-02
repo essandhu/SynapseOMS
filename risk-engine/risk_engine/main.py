@@ -17,13 +17,22 @@ from contextlib import asynccontextmanager
 from decimal import Decimal
 from typing import AsyncIterator
 
+import numpy as np
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from risk_engine.concentration.analyzer import ConcentrationAnalyzer
 from risk_engine.domain.portfolio import Portfolio
+from risk_engine.greeks.calculator import GreeksCalculator
 from risk_engine.grpc_server.server import serve as grpc_serve
 from risk_engine.kafka.consumer import PortfolioStateBuilder
+from risk_engine.optimizer.mean_variance import PortfolioOptimizer
+from risk_engine.rest.router_optimizer import (
+    OptimizerDependencies,
+    configure_dependencies as configure_optimizer_dependencies,
+    router as optimizer_router,
+)
 from risk_engine.rest.router_risk import (
     RiskDependencies,
     configure_dependencies,
@@ -31,6 +40,7 @@ from risk_engine.rest.router_risk import (
 )
 from risk_engine.settlement.tracker import SettlementTracker
 from risk_engine.var.historical import HistoricalVaR
+from risk_engine.var.monte_carlo import MonteCarloVaR
 from risk_engine.var.parametric import ParametricVaR
 
 # ---------------------------------------------------------------------------
@@ -71,6 +81,13 @@ portfolio = Portfolio()
 settlement_tracker = SettlementTracker()
 historical_var = HistoricalVaR()
 parametric_var = ParametricVaR()
+monte_carlo_var = MonteCarloVaR(num_simulations=10_000, horizon_days=1, confidence=0.99)
+portfolio_optimizer = PortfolioOptimizer()
+concentration_analyzer = ConcentrationAnalyzer(
+    single_name_threshold=0.25,
+    asset_class_threshold=0.50,
+)
+greeks_calculator = GreeksCalculator()
 
 # ---------------------------------------------------------------------------
 # Subsystem references (set during startup, used for health checks & shutdown)
@@ -118,8 +135,20 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         historical_var=historical_var,
         parametric_var=parametric_var,
         settlement_tracker=settlement_tracker,
+        monte_carlo_var=monte_carlo_var,
+        greeks_calculator=greeks_calculator,
+        concentration_analyzer=concentration_analyzer,
     )
     configure_dependencies(deps)
+
+    # 1b. Configure optimizer dependencies ----------------------------------
+    optimizer_deps = OptimizerDependencies(
+        portfolio=portfolio,
+        optimizer=portfolio_optimizer,
+        expected_returns=np.array([]),
+        covariance_matrix=np.array([]).reshape(0, 0),
+    )
+    configure_optimizer_dependencies(optimizer_deps)
 
     # 2. Start Kafka consumer (background thread) ---------------------------
     kafka_consumer = PortfolioStateBuilder(
@@ -208,6 +237,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 app.include_router(risk_router)
+app.include_router(optimizer_router)
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +257,10 @@ async def health() -> dict:
             if kafka_consumer and kafka_consumer._running
             else "not_started"
         ),
+        "monte_carlo_var": "ok" if monte_carlo_var else "not_configured",
+        "portfolio_optimizer": "ok" if portfolio_optimizer else "not_configured",
+        "concentration_analyzer": "ok" if concentration_analyzer else "not_configured",
+        "greeks_calculator": "ok" if greeks_calculator else "not_configured",
     }
 
 
