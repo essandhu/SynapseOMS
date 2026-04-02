@@ -30,7 +30,12 @@ type ReadStore interface {
 }
 
 // NewRouter creates a new chi router with all REST endpoints and middleware.
-func NewRouter(pipeline OrderSubmitter, store ReadStore) http.Handler {
+func NewRouter(pipeline OrderSubmitter, store ReadStore, opts ...RouterOption) http.Handler {
+	cfg := &routerConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
+
 	r := chi.NewRouter()
 
 	// Middleware stack
@@ -56,9 +61,44 @@ func NewRouter(pipeline OrderSubmitter, store ReadStore) http.Handler {
 		r.Get("/positions/{instrumentID}", h.getPosition)
 
 		r.Get("/instruments", h.listInstruments)
+
+		// Venue endpoints
+		if cfg.venueHandler != nil {
+			r.Get("/venues", cfg.venueHandler.listVenues)
+			r.Post("/venues/{id}/connect", cfg.venueHandler.connectVenue)
+			r.Post("/venues/{id}/disconnect", cfg.venueHandler.disconnectVenue)
+		}
+
+		// Credential endpoints
+		if cfg.credentialHandler != nil {
+			r.Post("/credentials", cfg.credentialHandler.storeCredential)
+			r.Delete("/credentials/{venue_id}", cfg.credentialHandler.deleteCredential)
+		}
 	})
 
 	return r
+}
+
+// RouterOption configures optional dependencies for the router.
+type RouterOption func(*routerConfig)
+
+type routerConfig struct {
+	venueHandler      *VenueHandler
+	credentialHandler *CredentialHandler
+}
+
+// WithVenueHandler adds venue endpoints to the router.
+func WithVenueHandler(vh *VenueHandler) RouterOption {
+	return func(c *routerConfig) {
+		c.venueHandler = vh
+	}
+}
+
+// WithCredentialHandler adds credential endpoints to the router.
+func WithCredentialHandler(ch *CredentialHandler) RouterOption {
+	return func(c *routerConfig) {
+		c.credentialHandler = ch
+	}
 }
 
 // handler holds the dependencies for REST handlers.

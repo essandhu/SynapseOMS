@@ -3,6 +3,8 @@ import { NavLink, Outlet } from "react-router";
 const NAV_TABS = [
   { label: "Blotter", to: "/" },
   { label: "Portfolio", to: "/portfolio" },
+  { label: "Risk", to: "/risk" },
+  { label: "Venues", to: "/venues" },
 ] as const;
 
 export function TerminalLayout() {

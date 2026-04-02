@@ -242,7 +242,7 @@ func TestAdapter_SixInstrumentsPreloaded(t *testing.T) {
 // Test 8: FillFeed channel receives fills asynchronously
 func TestAdapter_FillFeedAsync(t *testing.T) {
 	a := NewAdapter(nil).(*Adapter)
-	err := a.Connect(context.Background())
+	err := a.Connect(context.Background(), domain.VenueCredential{})
 	if err != nil {
 		t.Fatalf("connect failed: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestAdapter_StatusTransitions(t *testing.T) {
 		t.Error("expected initial status Disconnected")
 	}
 
-	_ = a.Connect(context.Background())
+	_ = a.Connect(context.Background(), domain.VenueCredential{})
 	if a.Status() != adapter.Connected {
 		t.Error("expected status Connected after Connect")
 	}

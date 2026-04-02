@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/synapse-oms/gateway/internal/adapter"
 	"github.com/synapse-oms/gateway/internal/domain"
+	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
 )
 
 // --- In-memory Store mock ---
@@ -120,17 +121,20 @@ type mockVenue struct {
 func newMockVenue() *mockVenue {
 	return &mockVenue{
 		fillCh:  make(chan domain.Fill, 100),
-		venueID: "simulated",
+		venueID: "sim-exchange",
 		status:  adapter.Connected,
 	}
 }
 
-func (v *mockVenue) VenueID() string   { return v.venueID }
+func (v *mockVenue) VenueID() string  { return v.venueID }
 func (v *mockVenue) VenueName() string { return "Mock Venue" }
+func (v *mockVenue) SupportedAssetClasses() []domain.AssetClass {
+	return []domain.AssetClass{domain.AssetClassEquity, domain.AssetClassCrypto}
+}
 func (v *mockVenue) SupportedInstruments() ([]domain.Instrument, error) {
 	return nil, nil
 }
-func (v *mockVenue) Connect(_ context.Context) error {
+func (v *mockVenue) Connect(_ context.Context, _ domain.VenueCredential) error {
 	v.status = adapter.Connected
 	return nil
 }
@@ -138,7 +142,8 @@ func (v *mockVenue) Disconnect(_ context.Context) error {
 	v.status = adapter.Disconnected
 	return nil
 }
-func (v *mockVenue) Status() adapter.VenueStatus { return v.status }
+func (v *mockVenue) Status() adapter.VenueStatus                                { return v.status }
+func (v *mockVenue) Ping(_ context.Context) (time.Duration, error)              { return 0, nil }
 
 func (v *mockVenue) SubmitOrder(_ context.Context, order *domain.Order) (*adapter.VenueAck, error) {
 	v.mu.Lock()
@@ -154,10 +159,81 @@ func (v *mockVenue) CancelOrder(_ context.Context, _ domain.OrderID, _ string) e
 	return nil
 }
 
+func (v *mockVenue) QueryOrder(_ context.Context, _ string) (*domain.Order, error) {
+	return nil, fmt.Errorf("not found")
+}
+
+func (v *mockVenue) SubscribeMarketData(_ context.Context, _ []string) (<-chan adapter.MarketDataSnapshot, error) {
+	return make(chan adapter.MarketDataSnapshot), nil
+}
+
+func (v *mockVenue) UnsubscribeMarketData(_ context.Context, _ []string) error {
+	return nil
+}
+
 func (v *mockVenue) FillFeed() <-chan domain.Fill { return v.fillCh }
+
+func (v *mockVenue) Capabilities() adapter.VenueCapabilities {
+	return adapter.VenueCapabilities{}
+}
 
 func (v *mockVenue) sendFill(f domain.Fill) {
 	v.fillCh <- f
+}
+
+// --- Mock risk client ---
+
+type mockRiskClient struct {
+	approved     bool
+	rejectReason string
+	err          error
+}
+
+func newMockRiskClient(approved bool) *mockRiskClient {
+	return &mockRiskClient{approved: approved}
+}
+
+func (r *mockRiskClient) CheckPreTradeRisk(_ context.Context, _ *domain.Order) (*riskgrpc.RiskCheckResult, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return &riskgrpc.RiskCheckResult{
+		Approved:     r.approved,
+		RejectReason: r.rejectReason,
+	}, nil
+}
+
+func (r *mockRiskClient) Close() error { return nil }
+
+// --- Mock Kafka publisher ---
+
+type mockKafkaPublisher struct {
+	mu       sync.Mutex
+	messages []kafkaMsg
+}
+
+type kafkaMsg struct {
+	instrumentID string
+	payload      []byte
+}
+
+func newMockKafkaPublisher() *mockKafkaPublisher {
+	return &mockKafkaPublisher{}
+}
+
+func (k *mockKafkaPublisher) PublishOrderLifecycle(_ context.Context, instrumentID string, payload []byte) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.messages = append(k.messages, kafkaMsg{instrumentID: instrumentID, payload: payload})
+	return nil
+}
+
+func (k *mockKafkaPublisher) getMessages() []kafkaMsg {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	out := make([]kafkaMsg, len(k.messages))
+	copy(out, k.messages)
+	return out
 }
 
 // --- Mock notifier ---
@@ -202,7 +278,7 @@ func (n *mockNotifier) getPositionUpdates() []*domain.Position {
 	return out
 }
 
-// --- Helper ---
+// --- Helpers ---
 
 func makeOrder() *domain.Order {
 	return &domain.Order{
@@ -214,6 +290,11 @@ func makeOrder() *domain.Order {
 		Price:         decimal.NewFromFloat(185.00),
 		AssetClass:    domain.AssetClassEquity,
 	}
+}
+
+func makePipeline(store *memStore, venue *mockVenue, notifier *mockNotifier) *Pipeline {
+	risk := newMockRiskClient(true)
+	return NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk)
 }
 
 func waitFor(t *testing.T, timeout time.Duration, check func() bool, msg string) {
@@ -235,7 +316,7 @@ func TestSubmitOrderAppearsAsNew(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p.Start(ctx)
@@ -266,7 +347,7 @@ func TestPipelineTransitionsToAcknowledged(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p.Start(ctx)
@@ -288,7 +369,7 @@ func TestFillTransitionsToFilled(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p.Start(ctx)
@@ -308,7 +389,7 @@ func TestFillTransitionsToFilled(t *testing.T) {
 	venue.sendFill(domain.Fill{
 		ID:          "fill-1",
 		OrderID:     order.ID,
-		VenueID:     "simulated",
+		VenueID:     "sim-exchange",
 		Quantity:    decimal.NewFromInt(100),
 		Price:       decimal.NewFromFloat(185.50),
 		Fee:         decimal.NewFromFloat(0.50),
@@ -326,7 +407,7 @@ func TestFillTransitionsToFilled(t *testing.T) {
 
 	// Position should be updated
 	waitFor(t, 2*time.Second, func() bool {
-		pos := store.getPosition("AAPL", "simulated")
+		pos := store.getPosition("AAPL", "sim-exchange")
 		return pos != nil && pos.Quantity.Equal(decimal.NewFromInt(100))
 	}, "position to be updated")
 
@@ -347,7 +428,7 @@ func TestMultipleFillsAccumulatePosition(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p.Start(ctx)
@@ -380,7 +461,7 @@ func TestMultipleFillsAccumulatePosition(t *testing.T) {
 	venue.sendFill(domain.Fill{
 		ID:          "fill-1",
 		OrderID:     order1.ID,
-		VenueID:     "simulated",
+		VenueID:     "sim-exchange",
 		Quantity:    decimal.NewFromInt(100),
 		Price:       decimal.NewFromFloat(185.00),
 		Fee:         decimal.NewFromFloat(0.50),
@@ -398,7 +479,7 @@ func TestMultipleFillsAccumulatePosition(t *testing.T) {
 	venue.sendFill(domain.Fill{
 		ID:          "fill-2",
 		OrderID:     order2.ID,
-		VenueID:     "simulated",
+		VenueID:     "sim-exchange",
 		Quantity:    decimal.NewFromInt(50),
 		Price:       decimal.NewFromFloat(186.00),
 		Fee:         decimal.NewFromFloat(0.25),
@@ -414,7 +495,7 @@ func TestMultipleFillsAccumulatePosition(t *testing.T) {
 	}, "order2 to be filled")
 
 	// Position should have accumulated: 100 + 50 = 150 shares
-	pos := store.getPosition("AAPL", "simulated")
+	pos := store.getPosition("AAPL", "sim-exchange")
 	if pos == nil {
 		t.Fatal("expected position to exist")
 	}
@@ -428,7 +509,7 @@ func TestShutdownCompletesWithinTimeout(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	p.Start(ctx)
 
@@ -458,7 +539,7 @@ func TestPartialFillTransitionsToPartiallyFilled(t *testing.T) {
 	venue := newMockVenue()
 	notifier := newMockNotifier()
 
-	p := NewPipeline(store, venue, notifier)
+	p := makePipeline(store, venue, notifier)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p.Start(ctx)
@@ -478,7 +559,7 @@ func TestPartialFillTransitionsToPartiallyFilled(t *testing.T) {
 	venue.sendFill(domain.Fill{
 		ID:          "fill-partial",
 		OrderID:     order.ID,
-		VenueID:     "simulated",
+		VenueID:     "sim-exchange",
 		Quantity:    decimal.NewFromInt(50),
 		Price:       decimal.NewFromFloat(185.00),
 		Fee:         decimal.NewFromFloat(0.25),
@@ -497,7 +578,7 @@ func TestPartialFillTransitionsToPartiallyFilled(t *testing.T) {
 	venue.sendFill(domain.Fill{
 		ID:          "fill-rest",
 		OrderID:     order.ID,
-		VenueID:     "simulated",
+		VenueID:     "sim-exchange",
 		Quantity:    decimal.NewFromInt(50),
 		Price:       decimal.NewFromFloat(186.00),
 		Fee:         decimal.NewFromFloat(0.25),
@@ -511,4 +592,201 @@ func TestPartialFillTransitionsToPartiallyFilled(t *testing.T) {
 		o := store.getOrder(order.ID)
 		return o != nil && o.Status == domain.OrderStatusFilled
 	}, "order to be fully filled after two partial fills")
+}
+
+// --- Phase 2 specific tests ---
+
+func TestRiskRejectionRejectsOrder(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+	risk := &mockRiskClient{approved: false, rejectReason: "VaR limit exceeded"}
+
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// The order should be rejected by risk check, not routed to venue
+	waitFor(t, 2*time.Second, func() bool {
+		updates := notifier.getOrderUpdates()
+		for _, u := range updates {
+			if u.ID == order.ID && u.Status == domain.OrderStatusRejected {
+				return true
+			}
+		}
+		return false
+	}, "order to be rejected by risk check")
+}
+
+func TestRiskErrorFailsOpen(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+	risk := &mockRiskClient{err: fmt.Errorf("connection refused")}
+
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithFailOpenRisk(true))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// With fail-open, the order should pass through risk and reach acknowledged
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusAcknowledged
+	}, "order to be acknowledged despite risk error (fail-open)")
+}
+
+func TestRiskErrorFailsClosed(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+	risk := &mockRiskClient{err: fmt.Errorf("connection refused")}
+
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithFailOpenRisk(false))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// With fail-closed, the order should be rejected
+	waitFor(t, 2*time.Second, func() bool {
+		updates := notifier.getOrderUpdates()
+		for _, u := range updates {
+			if u.ID == order.ID && u.Status == domain.OrderStatusRejected {
+				return true
+			}
+		}
+		return false
+	}, "order to be rejected when risk engine fails (fail-closed)")
+}
+
+func TestMultiVenueRouting(t *testing.T) {
+	store := newMemStore()
+
+	equityVenue := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "alpaca",
+		status:  adapter.Connected,
+	}
+	cryptoVenue := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "binance_testnet",
+		status:  adapter.Connected,
+	}
+	simVenue := newMockVenue() // sim-exchange
+
+	venues := []adapter.LiquidityProvider{equityVenue, cryptoVenue, simVenue}
+	notifier := newMockNotifier()
+	risk := newMockRiskClient(true)
+
+	p := NewPipeline(store, venues, notifier, risk)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	// Submit equity order -> should route to alpaca
+	equityOrder := makeOrder()
+	equityOrder.AssetClass = domain.AssetClassEquity
+	if err := p.Submit(ctx, equityOrder); err != nil {
+		t.Fatalf("Submit equity order failed: %v", err)
+	}
+
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(equityOrder.ID)
+		return o != nil && o.VenueID == "alpaca" && o.Status == domain.OrderStatusAcknowledged
+	}, "equity order to be routed to alpaca")
+
+	// Submit crypto order -> should route to binance_testnet
+	cryptoOrder := &domain.Order{
+		ClientOrderID: "client-crypto-1",
+		InstrumentID:  "BTC-USD",
+		Side:          domain.SideBuy,
+		Type:          domain.OrderTypeMarket,
+		Quantity:      decimal.NewFromFloat(0.01),
+		Price:         decimal.NewFromFloat(50000.00),
+		AssetClass:    domain.AssetClassCrypto,
+	}
+	if err := p.Submit(ctx, cryptoOrder); err != nil {
+		t.Fatalf("Submit crypto order failed: %v", err)
+	}
+
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(cryptoOrder.ID)
+		return o != nil && o.VenueID == "binance_testnet" && o.Status == domain.OrderStatusAcknowledged
+	}, "crypto order to be routed to binance_testnet")
+}
+
+func TestKafkaPublisherReceivesEvents(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+	risk := newMockRiskClient(true)
+	kafka := newMockKafkaPublisher()
+
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithKafkaPublisher(kafka))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// Wait for order to be acknowledged (which triggers Kafka publish)
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusAcknowledged
+	}, "order to be acknowledged")
+
+	// Kafka should have received at least one event
+	waitFor(t, 2*time.Second, func() bool {
+		msgs := kafka.getMessages()
+		return len(msgs) > 0
+	}, "kafka to receive order lifecycle event")
+
+	msgs := kafka.getMessages()
+	if msgs[0].instrumentID != "AAPL" {
+		t.Fatalf("expected kafka message for AAPL, got %s", msgs[0].instrumentID)
+	}
+}
+
+func TestNilRiskClientUsesFailOpen(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+
+	// Pass nil risk client -- should use fail-open client internally
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	waitFor(t, 2*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusAcknowledged
+	}, "order to be acknowledged with nil risk client")
 }

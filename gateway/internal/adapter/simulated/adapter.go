@@ -48,6 +48,7 @@ type Adapter struct {
 	instruments []domain.Instrument
 	status      adapter.VenueStatus
 	logger      *slog.Logger
+	mdCh        chan adapter.MarketDataSnapshot
 }
 
 // NewAdapter creates a new simulated exchange adapter.
@@ -100,14 +101,18 @@ func NewAdapter(_ map[string]string) adapter.LiquidityProvider {
 	}
 }
 
-func (a *Adapter) VenueID() string   { return venueID }
-func (a *Adapter) VenueName() string  { return venueName }
+func (a *Adapter) VenueID() string  { return venueID }
+func (a *Adapter) VenueName() string { return venueName }
+
+func (a *Adapter) SupportedAssetClasses() []domain.AssetClass {
+	return []domain.AssetClass{domain.AssetClassEquity, domain.AssetClassCrypto}
+}
 
 func (a *Adapter) SupportedInstruments() ([]domain.Instrument, error) {
 	return a.instruments, nil
 }
 
-func (a *Adapter) Connect(_ context.Context) error {
+func (a *Adapter) Connect(_ context.Context, _ domain.VenueCredential) error {
 	a.logger.Info("connecting to simulated exchange")
 	a.engine.Start()
 	a.status = adapter.Connected
@@ -125,6 +130,10 @@ func (a *Adapter) Disconnect(_ context.Context) error {
 
 func (a *Adapter) Status() adapter.VenueStatus {
 	return a.status
+}
+
+func (a *Adapter) Ping(_ context.Context) (time.Duration, error) {
+	return 0, nil
 }
 
 func (a *Adapter) SubmitOrder(_ context.Context, order *domain.Order) (*adapter.VenueAck, error) {
@@ -176,8 +185,55 @@ func (a *Adapter) CancelOrder(_ context.Context, orderID domain.OrderID, venueOr
 	return nil
 }
 
+func (a *Adapter) QueryOrder(_ context.Context, venueOrderID string) (*domain.Order, error) {
+	if a.status != adapter.Connected {
+		return nil, fmt.Errorf("simulated exchange not connected")
+	}
+
+	a.engine.mu.RLock()
+	defer a.engine.mu.RUnlock()
+	for _, book := range a.engine.books {
+		book.mu.Lock()
+		for _, o := range book.orders {
+			if fmt.Sprintf("SIM-%s", o.ID) == venueOrderID {
+				book.mu.Unlock()
+				return o, nil
+			}
+		}
+		book.mu.Unlock()
+	}
+
+	return nil, fmt.Errorf("order %s not found", venueOrderID)
+}
+
+func (a *Adapter) SubscribeMarketData(_ context.Context, _ []string) (<-chan adapter.MarketDataSnapshot, error) {
+	if a.status != adapter.Connected {
+		return nil, fmt.Errorf("simulated exchange not connected")
+	}
+
+	// Return a buffered channel; the simulated exchange does not actively push
+	// market data snapshots yet, but the channel is ready for future use.
+	ch := make(chan adapter.MarketDataSnapshot, 100)
+	a.mdCh = ch
+	return ch, nil
+}
+
+func (a *Adapter) UnsubscribeMarketData(_ context.Context, _ []string) error {
+	// No-op for simulated exchange.
+	return nil
+}
+
 func (a *Adapter) FillFeed() <-chan domain.Fill {
 	return a.fillCh
+}
+
+func (a *Adapter) Capabilities() adapter.VenueCapabilities {
+	return adapter.VenueCapabilities{
+		SupportedOrderTypes:   []domain.OrderType{domain.OrderTypeMarket, domain.OrderTypeLimit},
+		SupportedAssetClasses: []domain.AssetClass{domain.AssetClassEquity, domain.AssetClassCrypto},
+		SupportsStreaming:      true,
+		MaxOrdersPerSecond:    1000,
+	}
 }
 
 func init() {

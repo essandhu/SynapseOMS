@@ -107,3 +107,62 @@ export interface SubmitOrderRequest {
   price?: string;
   venueId: string;
 }
+
+/** Value-at-Risk metrics from risk engine */
+export interface VaRMetrics {
+  historicalVaR: string;
+  parametricVaR: string;
+  monteCarloVaR: string | null;
+  cvar: string;
+  confidence: number;
+  horizon: string;
+  computedAt: string;
+  monteCarloDistribution: number[] | null;
+}
+
+/** Drawdown tracking data */
+export interface DrawdownData {
+  current: number;
+  peak: string;
+  trough: string;
+  history: { date: string; drawdown: number }[];
+}
+
+/** Settlement timeline data */
+export interface SettlementTimeline {
+  totalUnsettled: string;
+  entries: {
+    date: string;
+    amount: string;
+    instrumentId: string;
+    assetClass: AssetClass;
+  }[];
+}
+
+/** Portfolio summary from risk engine */
+export interface PortfolioSummary {
+  totalNav: string;
+  totalPnl: string;
+  dailyPnl: string;
+  positionCount: number;
+}
+
+/** Exposure data from risk engine */
+export interface ExposureData {
+  byAssetClass: { assetClass: AssetClass; notional: string; percentage: number }[];
+  byVenue: { venueId: string; notional: string; percentage: number }[];
+}
+
+/** WebSocket update envelope for risk changes */
+export type RiskUpdate =
+  | { type: "var_update"; payload: VaRMetrics }
+  | { type: "drawdown_update"; payload: DrawdownData }
+  | { type: "settlement_update"; payload: SettlementTimeline };
+
+/** WebSocket update envelope for venue status changes */
+export interface VenueStatusUpdate {
+  type: "venue_connected" | "venue_disconnected" | "venue_degraded";
+  venueId: string;
+  status: string;
+  latencyMs?: number;
+}

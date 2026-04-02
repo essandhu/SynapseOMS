@@ -1,0 +1,211 @@
+package rest
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/synapse-oms/gateway/internal/adapter"
+	"github.com/synapse-oms/gateway/internal/apperror"
+	"github.com/synapse-oms/gateway/internal/domain"
+)
+
+// CredentialChecker is the minimal interface needed by VenueHandler.
+type CredentialChecker interface {
+	HasCredential(ctx context.Context, venueID string) (bool, error)
+}
+
+// CredentialRetriever extends CredentialChecker with the ability to load
+// decrypted credentials for connecting to a venue.
+type CredentialRetriever interface {
+	CredentialChecker
+	Retrieve(ctx context.Context, venueID string) (*domain.VenueCredential, error)
+}
+
+// VenueHandler implements REST endpoints for venue management.
+type VenueHandler struct {
+	credMgr CredentialRetriever
+	logger  *slog.Logger
+}
+
+// NewVenueHandler creates a VenueHandler with the given dependencies.
+func NewVenueHandler(credMgr CredentialRetriever, logger *slog.Logger) *VenueHandler {
+	return &VenueHandler{
+		credMgr: credMgr,
+		logger:  logger,
+	}
+}
+
+// venueResponse is the JSON response for a single venue.
+type venueResponse struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Type            string   `json:"type"`
+	Status          string   `json:"status"`
+	SupportedAssets []string `json:"supportedAssets"`
+	HasCredentials  bool     `json:"hasCredentials"`
+	LatencyMs       int64    `json:"latencyMs"`
+}
+
+// listVenues handles GET /api/v1/venues.
+func (h *VenueHandler) listVenues(w http.ResponseWriter, r *http.Request) {
+	instances := adapter.ListInstances()
+
+	result := make([]venueResponse, 0, len(instances))
+	for _, p := range instances {
+		hasCred, err := h.credMgr.HasCredential(r.Context(), p.VenueID())
+		if err != nil {
+			h.logger.WarnContext(r.Context(), "failed to check credentials",
+				slog.String("venue_id", p.VenueID()),
+				slog.String("error", err.Error()),
+			)
+			hasCred = false
+		}
+
+		var latencyMs int64
+		if p.Status() == adapter.Connected {
+			latency, err := p.Ping(r.Context())
+			if err == nil {
+				latencyMs = latency.Milliseconds()
+			}
+		}
+
+		assets := make([]string, 0, len(p.SupportedAssetClasses()))
+		for _, ac := range p.SupportedAssetClasses() {
+			assets = append(assets, assetClassToString(ac))
+		}
+
+		venueType := "exchange"
+		caps := p.Capabilities()
+		if len(caps.SupportedAssetClasses) > 0 {
+			first := caps.SupportedAssetClasses[0]
+			if first == domain.AssetClassCrypto {
+				venueType = "crypto_exchange"
+			}
+		}
+
+		result = append(result, venueResponse{
+			ID:              p.VenueID(),
+			Name:            p.VenueName(),
+			Type:            venueType,
+			Status:          strings.ToLower(p.Status().String()),
+			SupportedAssets: assets,
+			HasCredentials:  hasCred,
+			LatencyMs:       latencyMs,
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+// connectVenue handles POST /api/v1/venues/{id}/connect.
+func (h *VenueHandler) connectVenue(w http.ResponseWriter, r *http.Request) {
+	venueID := chi.URLParam(r, "id")
+
+	p, ok := adapter.GetInstance(venueID)
+	if !ok {
+		apperror.WriteError(w, &apperror.AppError{
+			Code:       "VENUE_NOT_FOUND",
+			Message:    "venue not found: " + venueID,
+			HTTPStatus: http.StatusNotFound,
+		})
+		return
+	}
+
+	cred, err := h.credMgr.Retrieve(r.Context(), venueID)
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "failed to retrieve credentials",
+			slog.String("venue_id", venueID),
+			slog.String("error", err.Error()),
+		)
+		apperror.WriteError(w, &apperror.AppError{
+			Code:       "CREDENTIAL_ERROR",
+			Message:    "credentials not found for venue: " + venueID,
+			HTTPStatus: http.StatusBadRequest,
+		})
+		return
+	}
+
+	if err := p.Connect(r.Context(), *cred); err != nil {
+		h.logger.ErrorContext(r.Context(), "failed to connect to venue",
+			slog.String("venue_id", venueID),
+			slog.String("error", err.Error()),
+		)
+		apperror.WriteError(w, &apperror.AppError{
+			Code:       "CONNECT_ERROR",
+			Message:    "failed to connect to venue: " + err.Error(),
+			HTTPStatus: http.StatusBadGateway,
+		})
+		return
+	}
+
+	h.logger.InfoContext(r.Context(), "venue connected",
+		slog.String("venue_id", venueID),
+	)
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"id":     venueID,
+		"status": "connected",
+	})
+}
+
+// disconnectVenue handles POST /api/v1/venues/{id}/disconnect.
+func (h *VenueHandler) disconnectVenue(w http.ResponseWriter, r *http.Request) {
+	venueID := chi.URLParam(r, "id")
+
+	p, ok := adapter.GetInstance(venueID)
+	if !ok {
+		apperror.WriteError(w, &apperror.AppError{
+			Code:       "VENUE_NOT_FOUND",
+			Message:    "venue not found: " + venueID,
+			HTTPStatus: http.StatusNotFound,
+		})
+		return
+	}
+
+	if err := p.Disconnect(r.Context()); err != nil {
+		h.logger.ErrorContext(r.Context(), "failed to disconnect from venue",
+			slog.String("venue_id", venueID),
+			slog.String("error", err.Error()),
+		)
+		apperror.WriteError(w, &apperror.AppError{
+			Code:       "DISCONNECT_ERROR",
+			Message:    "failed to disconnect from venue: " + err.Error(),
+			HTTPStatus: http.StatusBadGateway,
+		})
+		return
+	}
+
+	h.logger.InfoContext(r.Context(), "venue disconnected",
+		slog.String("venue_id", venueID),
+	)
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"id":     venueID,
+		"status": "disconnected",
+	})
+}
+
+// assetClassToString converts a domain.AssetClass to its JSON-friendly string.
+func assetClassToString(ac domain.AssetClass) string {
+	switch ac {
+	case domain.AssetClassEquity:
+		return "equity"
+	case domain.AssetClassCrypto:
+		return "crypto"
+	case domain.AssetClassTokenizedSecurity:
+		return "tokenized_security"
+	case domain.AssetClassFuture:
+		return "future"
+	case domain.AssetClassOption:
+		return "option"
+	default:
+		return "unknown"
+	}
+}

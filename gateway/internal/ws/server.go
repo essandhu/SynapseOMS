@@ -59,6 +59,11 @@ func (s *Server) HandlePositions(w http.ResponseWriter, r *http.Request) {
 	s.serveWS(w, r, StreamPositions)
 }
 
+// HandleVenues upgrades the connection for /ws/venues streaming.
+func (s *Server) HandleVenues(w http.ResponseWriter, r *http.Request) {
+	s.serveWS(w, r, StreamVenues)
+}
+
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, stream StreamType) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

@@ -3,6 +3,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"sync"
@@ -19,6 +20,7 @@ type StreamType string
 const (
 	StreamOrders    StreamType = "orders"
 	StreamPositions StreamType = "positions"
+	StreamVenues    StreamType = "venues"
 )
 
 // Message is the JSON envelope sent to WebSocket clients.
@@ -58,6 +60,24 @@ type positionData struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+// VenueStatusEvent represents a venue status change for broadcasting.
+type VenueStatusEvent struct {
+	VenueID   string
+	Name      string
+	Status    string
+	LatencyMs int64
+	Timestamp time.Time
+}
+
+// venueData is the JSON representation of a venue status update.
+type venueData struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	LatencyMs int64     `json:"latencyMs"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // client represents a connected WebSocket client.
 type client struct {
 	conn   *websocket.Conn
@@ -74,10 +94,14 @@ type Hub struct {
 	logger  *slog.Logger
 
 	// posThrottle tracks last position broadcast time for throttling.
-	posThrottleMu   sync.Mutex
+	posThrottleMu    sync.Mutex
 	posLastBroadcast time.Time
 	posPending       *positionData
 	posTimer         *time.Timer
+
+	// VenueStatusChan receives venue status events from adapters.
+	// The hub's Run loop monitors this channel and broadcasts to /ws/venues clients.
+	VenueStatusChan chan VenueStatusEvent
 }
 
 const positionThrottleInterval = 100 * time.Millisecond
@@ -85,8 +109,23 @@ const positionThrottleInterval = 100 * time.Millisecond
 // NewHub creates a new WebSocket hub.
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[*client]struct{}),
-		logger:  logging.NewDefault("gateway", "ws-hub"),
+		clients:         make(map[*client]struct{}),
+		logger:          logging.NewDefault("gateway", "ws-hub"),
+		VenueStatusChan: make(chan VenueStatusEvent, 64),
+	}
+}
+
+// Run starts the hub's event loop, monitoring the VenueStatusChan for
+// venue status events and broadcasting them to subscribed clients.
+// It blocks until the provided context is canceled.
+func (h *Hub) Run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event := <-h.VenueStatusChan:
+			h.NotifyVenueStatus(event)
+		}
 	}
 }
 
@@ -228,6 +267,37 @@ func (h *Hub) sendPositionUpdate(pd positionData) {
 		return
 	}
 	h.broadcast(StreamPositions, data)
+}
+
+// venueMessage is the JSON envelope for venue status updates.
+// It uses "venue" as the payload key per the API spec (differs from the generic "data" key).
+type venueMessage struct {
+	Type  string    `json:"type"`
+	Venue venueData `json:"venue"`
+}
+
+// NotifyVenueStatus broadcasts a venue status event to all /ws/venues clients.
+func (h *Hub) NotifyVenueStatus(event VenueStatusEvent) {
+	msgType := "venue_" + event.Status // e.g. "venue_connected", "venue_disconnected", "venue_degraded"
+
+	msg := venueMessage{
+		Type: msgType,
+		Venue: venueData{
+			ID:        event.VenueID,
+			Name:      event.Name,
+			Status:    event.Status,
+			LatencyMs: event.LatencyMs,
+			Timestamp: event.Timestamp,
+		},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		h.logger.Error("failed to marshal venue status", slog.String("error", err.Error()))
+		return
+	}
+
+	h.broadcast(StreamVenues, data)
 }
 
 // --- string helpers ---

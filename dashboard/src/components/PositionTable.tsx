@@ -2,6 +2,8 @@ import type { Position } from "../api/types";
 
 export interface PositionTableProps {
   positions: Position[];
+  /** Total NAV for computing % of NAV column. If omitted the column is hidden. */
+  totalNav?: number;
 }
 
 /** Format a decimal string to a fixed number of decimal places */
@@ -30,7 +32,7 @@ function formatQuantity(value: string): string {
   return formatDecimal(value, 4);
 }
 
-const COLUMNS = [
+const BASE_COLUMNS = [
   "Instrument",
   "Venue",
   "Qty",
@@ -41,7 +43,11 @@ const COLUMNS = [
   "Asset Class",
 ] as const;
 
-export function PositionTable({ positions }: PositionTableProps) {
+export function PositionTable({ positions, totalNav }: PositionTableProps) {
+  const showNavWeight = totalNav !== undefined && totalNav > 0;
+  const columns = showNavWeight
+    ? [...BASE_COLUMNS, "% of NAV" as const]
+    : BASE_COLUMNS;
   if (positions.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 font-mono text-xs text-text-muted">
@@ -55,7 +61,7 @@ export function PositionTable({ positions }: PositionTableProps) {
       <table className="w-full border-collapse font-mono text-xs">
         <thead>
           <tr className="border-b border-border">
-            {COLUMNS.map((col) => (
+            {columns.map((col) => (
               <th
                 key={col}
                 className="px-3 py-2 text-left font-medium uppercase tracking-wider text-text-muted"
@@ -96,6 +102,15 @@ export function PositionTable({ positions }: PositionTableProps) {
                 <td className="px-3 py-2 text-text-muted uppercase">
                   {pos.assetClass}
                 </td>
+                {showNavWeight && (
+                  <td className="px-3 py-2 text-text-secondary">
+                    {(() => {
+                      const mktVal = Math.abs(Number(pos.quantity) * Number(pos.marketPrice));
+                      const pct = (mktVal / totalNav) * 100;
+                      return `${pct.toFixed(1)}%`;
+                    })()}
+                  </td>
+                )}
               </tr>
             );
           })}

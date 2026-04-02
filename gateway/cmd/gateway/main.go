@@ -16,8 +16,13 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/synapse-oms/gateway/internal/adapter"
+	_ "github.com/synapse-oms/gateway/internal/adapter/alpaca"
+	_ "github.com/synapse-oms/gateway/internal/adapter/binance"
 	_ "github.com/synapse-oms/gateway/internal/adapter/simulated"
+	"github.com/synapse-oms/gateway/internal/credential"
 	"github.com/synapse-oms/gateway/internal/domain"
+	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
+	"github.com/synapse-oms/gateway/internal/kafka"
 	"github.com/synapse-oms/gateway/internal/logging"
 	"github.com/synapse-oms/gateway/internal/pipeline"
 	"github.com/synapse-oms/gateway/internal/rest"
@@ -33,11 +38,17 @@ func main() {
 	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("POSTGRES_URL", "postgres://localhost:5432/synapse")
 	viper.SetDefault("REDIS_URL", "redis://localhost:6379")
+	viper.SetDefault("KAFKA_BROKERS", "")
+	viper.SetDefault("RISK_ENGINE_GRPC", "")
+	viper.SetDefault("SYNAPSE_MASTER_PASSPHRASE", "")
 	viper.AutomaticEnv()
 
 	port := viper.GetString("PORT")
 	postgresURL := viper.GetString("POSTGRES_URL")
 	redisURL := viper.GetString("REDIS_URL")
+	kafkaBrokers := viper.GetString("KAFKA_BROKERS")
+	riskEngineAddr := viper.GetString("RISK_ENGINE_GRPC")
+	masterPassphrase := viper.GetString("SYNAPSE_MASTER_PASSPHRASE")
 
 	// -------------------------------------------------------
 	// 2. Initialize structured JSON logging
@@ -131,63 +142,159 @@ func main() {
 	}
 
 	// -------------------------------------------------------
-	// 6. Initialize simulated adapter and connect
+	// 6. Initialize all registered adapters
 	// -------------------------------------------------------
-	logger.Info("initializing simulated exchange adapter")
-	factory, ok := adapter.Get("simulated")
-	if !ok {
-		logger.Error("simulated adapter not registered")
-		os.Exit(1)
-	}
-	venue := factory(nil)
+	logger.Info("initializing venue adapters")
+	var venues []adapter.LiquidityProvider
 
-	if err := venue.Connect(ctx); err != nil {
-		logger.Error("failed to connect to simulated exchange",
-			slog.String("error", err.Error()))
+	for venueType, factory := range adapter.All() {
+		logger.Info("creating adapter instance", slog.String("venue_type", venueType))
+		venue := factory(nil)
+		adapter.RegisterInstance(venue.VenueID(), venue)
+		venues = append(venues, venue)
+		logger.Info("adapter instance registered",
+			slog.String("venue_id", venue.VenueID()),
+			slog.String("venue_name", venue.VenueName()),
+		)
+	}
+
+	if len(venues) == 0 {
+		logger.Error("no venue adapters registered")
 		os.Exit(1)
 	}
+
+	// Auto-connect the simulated adapter (no credentials needed)
+	if simVenue, ok := adapter.GetInstance("sim-exchange"); ok {
+		if err := simVenue.Connect(ctx, domain.VenueCredential{}); err != nil {
+			logger.Error("failed to connect to simulated exchange",
+				slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		logger.Info("simulated exchange connected",
+			slog.String("venue_id", simVenue.VenueID()))
+	}
+
 	defer func() {
-		logger.Info("disconnecting from simulated exchange")
-		_ = venue.Disconnect(context.Background())
+		logger.Info("disconnecting venue adapters")
+		for _, v := range venues {
+			if v.Status() == adapter.Connected {
+				_ = v.Disconnect(context.Background())
+			}
+		}
 	}()
-	logger.Info("simulated exchange connected",
-		slog.String("venue_id", venue.VenueID()))
+
+	logger.Info("venue adapters initialized",
+		slog.Int("count", len(venues)),
+	)
 
 	// -------------------------------------------------------
-	// 7. Initialize WebSocket hub
+	// 7. Initialize Kafka producer (optional)
+	// -------------------------------------------------------
+	var kafkaProducer *kafka.Producer
+	var pipelineOpts []pipeline.Option
+
+	if kafkaBrokers != "" {
+		logger.Info("initializing Kafka producer", slog.String("brokers", kafkaBrokers))
+		kafkaLogger := logging.New(os.Stdout, "gateway", "kafka")
+		kp, err := kafka.NewProducer(kafkaBrokers, kafkaLogger)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		kafkaProducer = kp
+		defer kafkaProducer.Close()
+		pipelineOpts = append(pipelineOpts, pipeline.WithKafkaPublisher(kafkaProducer))
+		logger.Info("Kafka producer initialized")
+	} else {
+		logger.Info("KAFKA_BROKERS not set, running without Kafka")
+	}
+
+	// -------------------------------------------------------
+	// 8. Initialize gRPC risk client
+	// -------------------------------------------------------
+	var riskClient riskgrpc.RiskClient
+
+	if riskEngineAddr != "" {
+		logger.Info("initializing risk engine client", slog.String("address", riskEngineAddr))
+		rc, err := riskgrpc.NewRiskClient(riskEngineAddr)
+		if err != nil {
+			logger.Error("failed to create risk client", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		riskClient = rc
+		defer riskClient.Close()
+		logger.Info("risk engine client initialized")
+	} else {
+		logger.Info("RISK_ENGINE_GRPC not set, using fail-open risk client")
+		riskClient = riskgrpc.NewFailOpenRiskClient()
+	}
+
+	// -------------------------------------------------------
+	// 9. Initialize credential manager (optional)
+	// -------------------------------------------------------
+	var credMgr *credential.CredentialManager
+
+	if masterPassphrase != "" {
+		logger.Info("initializing credential manager")
+		cm, err := credential.NewCredentialManager(masterPassphrase, pgStore)
+		if err != nil {
+			logger.Error("failed to create credential manager",
+				slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		credMgr = cm
+		logger.Info("credential manager initialized")
+	} else {
+		logger.Warn("SYNAPSE_MASTER_PASSPHRASE not set, credential management disabled")
+	}
+
+	// -------------------------------------------------------
+	// 10. Initialize WebSocket hub
 	// -------------------------------------------------------
 	logger.Info("initializing WebSocket hub")
 	hub := ws.NewHub()
 	wsSrv := ws.NewServer(hub)
+	go hub.Run(ctx)
 	logger.Info("WebSocket hub ready")
 
 	// -------------------------------------------------------
-	// 8. Initialize pipeline
+	// 11. Initialize pipeline
 	// -------------------------------------------------------
 	logger.Info("initializing order processing pipeline")
-	p := pipeline.NewPipeline(pgStore, venue, hub)
+	p := pipeline.NewPipeline(pgStore, venues, hub, riskClient, pipelineOpts...)
 
 	// -------------------------------------------------------
-	// 9. Start pipeline goroutines
+	// 12. Start pipeline goroutines
 	// -------------------------------------------------------
 	logger.Info("starting pipeline goroutines")
 	p.Start(ctx)
 
 	// -------------------------------------------------------
-	// 10. Initialize REST router and mount WS upgrade endpoints
+	// 13. Initialize REST router and mount WS upgrade endpoints
 	// -------------------------------------------------------
 	logger.Info("initializing REST router")
-	router := rest.NewRouter(p, pgStore)
+
+	var routerOpts []rest.RouterOption
+
+	if credMgr != nil {
+		venueHandler := rest.NewVenueHandler(credMgr, logger)
+		credHandler := rest.NewCredentialHandler(credMgr, logger)
+		routerOpts = append(routerOpts,
+			rest.WithVenueHandler(venueHandler),
+			rest.WithCredentialHandler(credHandler),
+		)
+	}
+
+	router := rest.NewRouter(p, pgStore, routerOpts...)
 
 	// Mount WebSocket upgrade endpoints on the same mux.
-	// rest.NewRouter returns an http.Handler (chi.Mux), so we wrap.
 	mux := http.NewServeMux()
 	mux.Handle("/", router)
 	mux.HandleFunc("/ws/orders", wsSrv.HandleOrders)
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
 
 	// -------------------------------------------------------
-	// 11. Start HTTP server
+	// 14. Start HTTP server
 	// -------------------------------------------------------
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
@@ -206,12 +313,19 @@ func main() {
 	}()
 
 	// -------------------------------------------------------
-	// 12. Log "Gateway ready"
+	// 15. Log "Gateway ready"
 	// -------------------------------------------------------
+	venueIDs := make([]string, 0, len(venues))
+	for _, v := range venues {
+		venueIDs = append(venueIDs, v.VenueID())
+	}
 	logger.Info("Gateway ready",
 		slog.String("port", port),
-		slog.String("venue", venue.VenueID()),
+		slog.Any("venues", venueIDs),
+		slog.Bool("kafka_enabled", kafkaProducer != nil),
+		slog.Bool("risk_engine_configured", riskEngineAddr != ""),
 		slog.Bool("redis_connected", redisClient != nil),
+		slog.Bool("credential_mgr_enabled", credMgr != nil),
 	)
 
 	// -------------------------------------------------------
@@ -276,7 +390,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated"},
+			Venues: []string{"simulated", "alpaca"},
 		},
 		{
 			ID:              "MSFT",
@@ -294,7 +408,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated"},
+			Venues: []string{"simulated", "alpaca"},
 		},
 		{
 			ID:              "GOOG",
@@ -312,7 +426,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated"},
+			Venues: []string{"simulated", "alpaca"},
 		},
 		{
 			ID:              "BTC-USD",
@@ -324,7 +438,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.00001),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated"},
+			Venues:          []string{"simulated", "binance_testnet"},
 		},
 		{
 			ID:              "ETH-USD",
@@ -336,7 +450,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.0001),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated"},
+			Venues:          []string{"simulated", "binance_testnet"},
 		},
 		{
 			ID:              "SOL-USD",
@@ -348,7 +462,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.01),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated"},
+			Venues:          []string{"simulated", "binance_testnet"},
 		},
 	}
 

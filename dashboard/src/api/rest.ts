@@ -1,8 +1,27 @@
 import ky from "ky";
-import type { Instrument, Order, Position, Venue, SubmitOrderRequest } from "./types";
+import type {
+  DrawdownData,
+  ExposureData,
+  Instrument,
+  Order,
+  PortfolioSummary,
+  Position,
+  SettlementTimeline,
+  VaRMetrics,
+  Venue,
+  SubmitOrderRequest,
+} from "./types";
 
 const api = ky.create({
   prefixUrl: import.meta.env.VITE_API_URL || "/api",
+  timeout: 10_000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+const riskApi = ky.create({
+  prefixUrl: import.meta.env.VITE_RISK_API_URL || "http://localhost:8081",
   timeout: 10_000,
   headers: {
     "Content-Type": "application/json",
@@ -42,4 +61,58 @@ export async function fetchInstruments(): Promise<Instrument[]> {
 /** Fetch all venues */
 export async function fetchVenues(): Promise<Venue[]> {
   return api.get("venues").json<Venue[]>();
+}
+
+/** Connect a venue */
+export async function connectVenue(venueId: string): Promise<void> {
+  await api.post(`venues/${venueId}/connect`);
+}
+
+/** Disconnect a venue */
+export async function disconnectVenue(venueId: string): Promise<void> {
+  await api.post(`venues/${venueId}/disconnect`);
+}
+
+/** Store venue credentials */
+export async function storeCredentials(
+  venueId: string,
+  apiKey: string,
+  apiSecret: string,
+  passphrase?: string,
+): Promise<void> {
+  await api.post("credentials", {
+    json: { venueId, apiKey, apiSecret, passphrase },
+  });
+}
+
+/** Delete venue credentials */
+export async function deleteCredentials(venueId: string): Promise<void> {
+  await api.delete(`credentials/${venueId}`);
+}
+
+// ── Risk Engine API ──────────────────────────────────────────────────
+
+/** Fetch VaR metrics */
+export async function fetchVaR(): Promise<VaRMetrics> {
+  return riskApi.get("api/v1/risk/var").json<VaRMetrics>();
+}
+
+/** Fetch drawdown data */
+export async function fetchDrawdown(): Promise<DrawdownData> {
+  return riskApi.get("api/v1/risk/drawdown").json<DrawdownData>();
+}
+
+/** Fetch settlement timeline */
+export async function fetchSettlement(): Promise<SettlementTimeline> {
+  return riskApi.get("api/v1/risk/settlement").json<SettlementTimeline>();
+}
+
+/** Fetch portfolio summary */
+export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
+  return riskApi.get("api/v1/portfolio").json<PortfolioSummary>();
+}
+
+/** Fetch exposure data */
+export async function fetchExposure(): Promise<ExposureData> {
+  return riskApi.get("api/v1/portfolio/exposure").json<ExposureData>();
 }

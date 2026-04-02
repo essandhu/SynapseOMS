@@ -1,7 +1,13 @@
 import ReconnectingWebSocket from "reconnecting-websocket";
-import type { OrderUpdate, PositionUpdate } from "./types";
+import type {
+  OrderUpdate,
+  PositionUpdate,
+  RiskUpdate,
+  VenueStatusUpdate,
+} from "./types";
 
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
+const RISK_WS = import.meta.env.VITE_RISK_WS_URL || "ws://localhost:8081";
 
 /**
  * Creates a WebSocket connection for real-time order updates.
@@ -43,4 +49,70 @@ export function createPositionStream(
   });
 
   return ws;
+}
+
+/**
+ * Creates a WebSocket connection for real-time risk updates.
+ * Automatically reconnects on disconnect.
+ */
+export function createRiskStream(
+  onUpdate: (update: RiskUpdate) => void,
+): ReconnectingWebSocket {
+  const ws = new ReconnectingWebSocket(`${RISK_WS}/ws/risk`);
+
+  ws.addEventListener("message", (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data as string) as RiskUpdate;
+      onUpdate(data);
+    } catch {
+      console.error("[ws:risk] Failed to parse message");
+    }
+  });
+
+  return ws;
+}
+
+/**
+ * Creates a WebSocket connection for real-time venue status updates.
+ * Automatically reconnects on disconnect.
+ */
+export function createVenueStream(
+  onUpdate: (update: VenueStatusUpdate) => void,
+): ReconnectingWebSocket {
+  const ws = new ReconnectingWebSocket(`${BASE_WS}/ws/venues`);
+
+  ws.addEventListener("message", (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data as string) as VenueStatusUpdate;
+      onUpdate(data);
+    } catch {
+      console.error("[ws:venues] Failed to parse message");
+    }
+  });
+
+  return ws;
+}
+
+/**
+ * Initialize all WebSocket streams and return a cleanup function.
+ * Connects order, position, risk, and venue streams simultaneously.
+ */
+export function initializeStreams(handlers: {
+  onOrderUpdate: (update: OrderUpdate) => void;
+  onPositionUpdate: (update: PositionUpdate) => void;
+  onRiskUpdate: (update: RiskUpdate) => void;
+  onVenueUpdate: (update: VenueStatusUpdate) => void;
+}): () => void {
+  const streams = [
+    createOrderStream(handlers.onOrderUpdate),
+    createPositionStream(handlers.onPositionUpdate),
+    createRiskStream(handlers.onRiskUpdate),
+    createVenueStream(handlers.onVenueUpdate),
+  ];
+
+  return () => {
+    for (const ws of streams) {
+      ws.close();
+    }
+  };
 }
