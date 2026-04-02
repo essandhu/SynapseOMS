@@ -9,7 +9,9 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /gateway ./cmd/gateway
 
-FROM gcr.io/distroless/static-debian12
+FROM alpine:3.20
+
+RUN apk add --no-cache curl
 
 COPY --from=builder /gateway /gateway
 
