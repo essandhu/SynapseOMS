@@ -506,7 +506,22 @@ func (p *Pipeline) routeSmart(ctx context.Context, order *domain.Order) {
 }
 
 // dispatchToVenue sends an order to the per-venue dispatch channel.
+// It first checks whether the target venue is connected. If the venue is
+// disconnected, the order is rejected immediately without affecting other venues.
 func (p *Pipeline) dispatchToVenue(ctx context.Context, order *domain.Order, venueID string) {
+	// Venue disconnect isolation: check adapter status before dispatching.
+	if err := adapter.CheckVenueReady(venueID); err != nil {
+		p.logger.Warn("venue disconnected, rejecting order",
+			slog.String("order_id", string(order.ID)),
+			slog.String("venue", venueID),
+			slog.String("error", err.Error()),
+		)
+		_ = order.ApplyTransition(domain.OrderStatusRejected)
+		_ = p.store.UpdateOrder(ctx, order)
+		p.notifyOrderUpdate(ctx, order)
+		return
+	}
+
 	ch, ok := p.dispatchCh[venueID]
 	if !ok {
 		p.logger.Error("no dispatch channel for venue",

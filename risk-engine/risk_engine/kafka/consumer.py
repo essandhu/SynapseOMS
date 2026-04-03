@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections.abc import Callable
 from decimal import Decimal
 
@@ -26,6 +27,11 @@ logger = structlog.get_logger()
 
 class PortfolioStateBuilder:
     """Kafka consumer that builds portfolio state from order lifecycle events."""
+
+    # Reconnection backoff parameters
+    INITIAL_BACKOFF_S: float = 1.0
+    MAX_BACKOFF_S: float = 60.0
+    BACKOFF_MULTIPLIER: float = 2.0
 
     def __init__(
         self,
@@ -48,6 +54,7 @@ class PortfolioStateBuilder:
         self._on_fill = on_fill
         self._on_order_complete = on_order_complete
         self._order_fills: dict[str, list[dict]] = {}  # order_id -> list of fills
+        self._consecutive_errors: int = 0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -76,7 +83,30 @@ class PortfolioStateBuilder:
     # ------------------------------------------------------------------
 
     def _consume_loop(self) -> None:
-        """Main consume loop running in background thread."""
+        """Main consume loop with automatic reconnection and exponential backoff.
+
+        If the Kafka consumer encounters a fatal error or fails to create,
+        it reconnects with exponential backoff (1s, 2s, 4s, ... up to 60s).
+        Successful message processing resets the backoff counter.
+        """
+        while self._running:
+            backoff = self._calculate_backoff()
+            try:
+                self._run_consumer()
+            except Exception as exc:  # noqa: BLE001
+                self._consecutive_errors += 1
+                if self._running:
+                    logger.error(
+                        "kafka_consumer_disconnected",
+                        error=str(exc),
+                        backoff_seconds=backoff,
+                        consecutive_errors=self._consecutive_errors,
+                    )
+                    # Sleep with early exit if stopped
+                    self._interruptible_sleep(backoff)
+
+    def _run_consumer(self) -> None:
+        """Create a consumer, subscribe, and poll until error or shutdown."""
         consumer = Consumer(self.consumer_config)
         consumer.subscribe(["order-lifecycle"])
 
@@ -88,12 +118,33 @@ class PortfolioStateBuilder:
                 if msg.error():
                     if msg.error().code() == KafkaError._PARTITION_EOF:
                         continue
+                    # Fatal errors trigger reconnection
+                    if msg.error().fatal():
+                        logger.error("kafka_fatal_error", error=str(msg.error()))
+                        return
                     logger.error("kafka_error", error=str(msg.error()))
                     continue
 
                 self._process_message(msg)
+                # Reset backoff on successful message processing
+                self._consecutive_errors = 0
         finally:
             consumer.close()
+
+    def _calculate_backoff(self) -> float:
+        """Calculate backoff duration based on consecutive error count."""
+        if self._consecutive_errors == 0:
+            return 0.0
+        backoff = self.INITIAL_BACKOFF_S * (
+            self.BACKOFF_MULTIPLIER ** (self._consecutive_errors - 1)
+        )
+        return min(backoff, self.MAX_BACKOFF_S)
+
+    def _interruptible_sleep(self, seconds: float) -> None:
+        """Sleep for up to *seconds*, waking early if ``_running`` becomes False."""
+        end = time.monotonic() + seconds
+        while self._running and time.monotonic() < end:
+            time.sleep(min(0.5, end - time.monotonic()))
 
     # ------------------------------------------------------------------
     # Message processing

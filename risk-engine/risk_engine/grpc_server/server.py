@@ -63,8 +63,16 @@ class RiskGateServicer:
     # gRPC handler
     # ------------------------------------------------------------------
 
+    # Maximum time budget for a pre-trade risk check (10ms).
+    RISK_CHECK_TIMEOUT_S: float = 0.010
+
     def CheckPreTradeRisk(self, request, context):  # noqa: N802 — matches proto
-        """Perform pre-trade risk checks on an incoming order."""
+        """Perform pre-trade risk checks on an incoming order.
+
+        Enforces a 10ms time budget. If the budget is exceeded mid-check,
+        the remaining checks are skipped and the order is approved (fail-open)
+        to avoid blocking the gateway pipeline.
+        """
         start_time = time.monotonic()
 
         # Extract correlation ID from gRPC metadata for structured logging
@@ -75,6 +83,7 @@ class RiskGateServicer:
         checks: list[dict] = []
         approved = True
         reject_reason = ""
+        timed_out = False
 
         quantity = Decimal(request.quantity)
         price = Decimal(request.price) if request.price else Decimal("0")
@@ -84,31 +93,51 @@ class RiskGateServicer:
             effective_price = self.portfolio.positions[request.instrument_id].market_price
         notional = quantity * effective_price if effective_price > 0 else quantity
 
+        def _budget_remaining() -> float:
+            return self.RISK_CHECK_TIMEOUT_S - (time.monotonic() - start_time)
+
         # Check 1: Order size limit
         size_check = self._check_order_size(notional)
         checks.append(size_check)
 
         # Check 2: Position concentration
-        concentration_check = self._check_concentration(request.instrument_id, notional)
-        checks.append(concentration_check)
+        if _budget_remaining() > 0:
+            concentration_check = self._check_concentration(request.instrument_id, notional)
+            checks.append(concentration_check)
+        else:
+            timed_out = True
 
         # Check 3: Available cash (buy orders only)
-        if request.side.upper() == "BUY":
-            cash_check = self._check_available_cash(notional)
-            checks.append(cash_check)
+        if not timed_out and request.side.upper() == "BUY":
+            if _budget_remaining() > 0:
+                cash_check = self._check_available_cash(notional)
+                checks.append(cash_check)
+            else:
+                timed_out = True
 
         # Check 4: VaR impact (only if returns data is loaded)
         var_before = "0"
         var_after = "0"
-        if self.returns_matrix is not None:
-            var_before, var_after, var_check = self._check_var_impact(
-                request.instrument_id,
-                request.side,
-                quantity,
-                effective_price,
-                request.asset_class,
+        if not timed_out and self.returns_matrix is not None:
+            if _budget_remaining() > 0:
+                var_before, var_after, var_check = self._check_var_impact(
+                    request.instrument_id,
+                    request.side,
+                    quantity,
+                    effective_price,
+                    request.asset_class,
+                )
+                checks.append(var_check)
+            else:
+                timed_out = True
+
+        if timed_out:
+            log.warning(
+                "risk_check_timeout",
+                elapsed_ms=int((time.monotonic() - start_time) * 1000),
+                checks_completed=len(checks),
+                msg="Time budget exceeded, approving remaining checks (fail-open)",
             )
-            checks.append(var_check)
 
         # Determine overall approval — first failing check wins
         for check in checks:

@@ -1,6 +1,36 @@
 package adapter
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
+
+// ErrVenueDisconnected is returned when an order targets a venue whose adapter
+// reports Status() == Disconnected. Other venues remain unaffected.
+type ErrVenueDisconnected struct {
+	VenueID string
+}
+
+func (e *ErrVenueDisconnected) Error() string {
+	return fmt.Sprintf("venue %s is disconnected", e.VenueID)
+}
+
+// CheckVenueReady returns an ErrVenueDisconnected if the given venue's adapter
+// reports a Disconnected status. Returns nil if the venue is connected/degraded,
+// or if the venue is not registered (that error is handled elsewhere).
+func CheckVenueReady(venueID string) error {
+	instancesMu.RLock()
+	provider, ok := instances[venueID]
+	instancesMu.RUnlock()
+	if !ok {
+		// Venue not in instance registry; let the pipeline handle "no venue" errors.
+		return nil
+	}
+	if provider.Status() == Disconnected {
+		return &ErrVenueDisconnected{VenueID: venueID}
+	}
+	return nil
+}
 
 // AdapterFactory creates a LiquidityProvider from a configuration map.
 type AdapterFactory func(config map[string]string) LiquidityProvider

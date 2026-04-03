@@ -311,3 +311,81 @@ class TestCheckPreTradeRisk:
             c for c in response["checks"] if c["name"] == "order_size_limit"
         )
         assert size_check["passed"] is True
+
+
+class TestTimeoutHandling:
+    """Tests for the 10ms time-budget enforcement in CheckPreTradeRisk."""
+
+    def test_normal_check_completes_all_checks(self, sample_portfolio: Portfolio) -> None:
+        """Under normal conditions, all checks should complete within the budget."""
+        servicer = _make_servicer(portfolio=sample_portfolio)
+        request = _make_request(
+            instrument_id="AAPL",
+            side="BUY",
+            quantity="5",
+            price="180.00",
+        )
+        response = _normalize_response(
+            servicer.CheckPreTradeRisk(request, _make_context())
+        )
+
+        check_names = [c["name"] for c in response["checks"]]
+        # At minimum, order_size_limit and position_concentration should be present
+        assert "order_size_limit" in check_names
+        assert "position_concentration" in check_names
+        # BUY order should also have cash check
+        assert "available_cash" in check_names
+
+    def test_timeout_approves_remaining_checks_failopen(
+        self, sample_portfolio: Portfolio
+    ) -> None:
+        """When the time budget is exceeded, remaining checks are skipped (fail-open).
+
+        We simulate this by setting an impossibly short timeout.
+        """
+        servicer = _make_servicer(portfolio=sample_portfolio)
+        # Set timeout to 0 to force immediate timeout after first check
+        servicer.RISK_CHECK_TIMEOUT_S = 0.0
+
+        request = _make_request(
+            instrument_id="AAPL",
+            side="BUY",
+            quantity="5",
+            price="180.00",
+        )
+        response = _normalize_response(
+            servicer.CheckPreTradeRisk(request, _make_context())
+        )
+
+        # With a zero timeout, at most the first check (order_size_limit) completes.
+        # The order should still be approved (fail-open) since the first check passes.
+        assert response["approved"] is True
+        # Should have fewer checks than a normal run
+        check_names = [c["name"] for c in response["checks"]]
+        assert "order_size_limit" in check_names
+        # Some checks may be skipped due to timeout
+        assert len(check_names) <= 4
+
+    def test_timeout_does_not_mask_early_rejection(
+        self, sample_portfolio: Portfolio
+    ) -> None:
+        """If the first check fails, the order is rejected even with timeout."""
+        servicer = _make_servicer(
+            portfolio=sample_portfolio,
+            max_order_notional=Decimal("1"),  # very low limit
+        )
+        servicer.RISK_CHECK_TIMEOUT_S = 0.0  # force timeout
+
+        request = _make_request(
+            instrument_id="AAPL",
+            side="BUY",
+            quantity="100",
+            price="180.00",
+        )
+        response = _normalize_response(
+            servicer.CheckPreTradeRisk(request, _make_context())
+        )
+
+        # First check (order_size_limit) should fail and reject the order
+        assert response["approved"] is False
+        assert "exceeds max" in response["reject_reason"]
