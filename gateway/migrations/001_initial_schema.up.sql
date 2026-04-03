@@ -72,4 +72,10 @@ CREATE TABLE IF NOT EXISTS positions (
     PRIMARY KEY (instrument_id, venue_id)
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 COMMIT;

@@ -137,6 +137,17 @@ export async function deleteCredentials(venueId: string): Promise<void> {
   await api.delete(`credentials/${venueId}`);
 }
 
+/** Check if onboarding has been completed */
+export async function fetchOnboardingStatus(): Promise<boolean> {
+  const res = await api.get("settings/onboarding_completed").json<{ completed: boolean }>();
+  return res.completed;
+}
+
+/** Mark onboarding as completed */
+export async function completeOnboarding(): Promise<void> {
+  await api.post("settings/onboarding_completed");
+}
+
 // ── Risk Engine API ──────────────────────────────────────────────────
 
 /** Fetch VaR metrics */

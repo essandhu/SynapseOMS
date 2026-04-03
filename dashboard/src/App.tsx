@@ -8,7 +8,7 @@ import { LiquidityNetwork } from "./views/LiquidityNetwork";
 import { OptimizerView } from "./views/OptimizerView";
 import { InsightsPanel } from "./views/InsightsPanel";
 import { OnboardingView } from "./views/OnboardingView";
-import { fetchVenues } from "./api/rest";
+import { fetchOnboardingStatus } from "./api/rest";
 import { initializeStreams } from "./api/ws";
 import { useInsightStore } from "./stores/insightStore";
 
@@ -21,12 +21,9 @@ function AppRoutes() {
 
     async function checkFirstRun() {
       try {
-        const venues = await fetchVenues();
-        const hasConnected = venues.some(
-          (v) => v.status === "connected" || v.hasCredentials,
-        );
+        const completed = await fetchOnboardingStatus();
         if (!cancelled) {
-          setNeedsOnboarding(!hasConnected);
+          setNeedsOnboarding(!completed);
         }
       } catch {
         // If the API is unreachable, assume first run
@@ -57,9 +54,17 @@ function AppRoutes() {
     );
   }
 
+  if (needsOnboarding) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingView onComplete={() => setNeedsOnboarding(false)} />} />
+        <Route path="*" element={<Navigate to="/onboarding" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/onboarding" element={<OnboardingView />} />
       <Route element={<TerminalLayout />}>
         <Route index element={<BlotterView />} />
         <Route path="portfolio" element={<PortfolioView />} />
@@ -68,9 +73,6 @@ function AppRoutes() {
         <Route path="optimizer" element={<OptimizerView />} />
         <Route path="insights" element={<InsightsPanel />} />
       </Route>
-      {needsOnboarding && (
-        <Route path="*" element={<Navigate to="/onboarding" replace />} />
-      )}
     </Routes>
   );
 }

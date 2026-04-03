@@ -13,6 +13,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { CredentialForm } from "../components/CredentialForm";
+import { completeOnboarding } from "../api/rest";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ const VENUE_OPTIONS: {
 
 // ── Main component ──────────────────────────────────────────────────────
 
-export function OnboardingView() {
+export function OnboardingView({ onComplete }: { onComplete?: () => void } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
   const [passphrase, setPassphrase] = useState("");
@@ -146,9 +147,15 @@ export function OnboardingView() {
     });
   }, [selectedVenue]);
 
-  const finishOnboarding = useCallback(() => {
+  const finishOnboarding = useCallback(async () => {
+    try {
+      await completeOnboarding();
+    } catch {
+      // Best-effort — navigate even if the API call fails
+    }
+    onComplete?.();
     navigate("/", { replace: true });
-  }, [navigate]);
+  }, [navigate, onComplete]);
 
   // ── Step renderers ──────────────────────────────────────────────────
 

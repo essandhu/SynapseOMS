@@ -354,6 +354,9 @@ func main() {
 		)
 	}
 
+	settingHandler := rest.NewSettingHandler(pgStore)
+	routerOpts = append(routerOpts, rest.WithSettingHandler(settingHandler))
+
 	restRouter := rest.NewRouter(p, pgStore, routerOpts...)
 
 	// Mount WebSocket upgrade endpoints on the same mux.

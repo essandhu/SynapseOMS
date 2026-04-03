@@ -20,11 +20,18 @@ vi.mock("../stores/venueStore", () => ({
     }),
 }));
 
+// Mock completeOnboarding API call
+const mockCompleteOnboarding = vi.fn();
+vi.mock("../api/rest", () => ({
+  completeOnboarding: (...args: unknown[]) => mockCompleteOnboarding(...args),
+}));
+
 describe("OnboardingView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStoreCredentials.mockResolvedValue(undefined);
     mockConnectVenue.mockResolvedValue(undefined);
+    mockCompleteOnboarding.mockResolvedValue(undefined);
   });
 
   // ── Step 1: Welcome ──────────────────────────────────────────────────
@@ -410,6 +417,10 @@ describe("OnboardingView", () => {
     fireEvent.click(screen.getByText("Skip to Finish"));
 
     fireEvent.click(screen.getByText("Open Trading Terminal"));
-    expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+
+    await waitFor(() => {
+      expect(mockCompleteOnboarding).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    });
   });
 });

@@ -74,6 +74,12 @@ func NewRouter(pipeline OrderSubmitter, store ReadStore, opts ...RouterOption) h
 			r.Post("/credentials", cfg.credentialHandler.storeCredential)
 			r.Delete("/credentials/{venue_id}", cfg.credentialHandler.deleteCredential)
 		}
+
+		// Settings endpoints
+		if cfg.settingHandler != nil {
+			r.Get("/settings/onboarding_completed", cfg.settingHandler.getOnboardingCompleted)
+			r.Post("/settings/onboarding_completed", cfg.settingHandler.completeOnboarding)
+		}
 	})
 
 	return r
@@ -85,6 +91,7 @@ type RouterOption func(*routerConfig)
 type routerConfig struct {
 	venueHandler      *VenueHandler
 	credentialHandler *CredentialHandler
+	settingHandler    *SettingHandler
 }
 
 // WithVenueHandler adds venue endpoints to the router.
@@ -98,6 +105,13 @@ func WithVenueHandler(vh *VenueHandler) RouterOption {
 func WithCredentialHandler(ch *CredentialHandler) RouterOption {
 	return func(c *routerConfig) {
 		c.credentialHandler = ch
+	}
+}
+
+// WithSettingHandler adds settings endpoints to the router.
+func WithSettingHandler(sh *SettingHandler) RouterOption {
+	return func(c *routerConfig) {
+		c.settingHandler = sh
 	}
 }
 
