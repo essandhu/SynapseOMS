@@ -332,6 +332,13 @@ func main() {
 	p.Start(ctx)
 
 	// -------------------------------------------------------
+	// 13a. Create market data aggregators (needed by VenueHandler)
+	// -------------------------------------------------------
+	mdOut := make(chan marketdata.OHLCBar, 256)
+	mdAgg1m := marketdata.NewAggregator(time.Minute, mdOut)
+	mdAgg5m := marketdata.NewAggregator(5*time.Minute, mdOut)
+
+	// -------------------------------------------------------
 	// 13. Initialize REST router and mount WS upgrade endpoints
 	// -------------------------------------------------------
 	logger.Info("initializing REST router")
@@ -339,7 +346,7 @@ func main() {
 	var routerOpts []rest.RouterOption
 
 	if credMgr != nil {
-		venueHandler := rest.NewVenueHandler(credMgr, logger)
+		venueHandler := rest.NewVenueHandler(credMgr, logger, mdAgg1m, mdAgg5m)
 		credHandler := rest.NewCredentialHandler(credMgr, logger)
 		routerOpts = append(routerOpts,
 			rest.WithVenueHandler(venueHandler),
@@ -360,11 +367,8 @@ func main() {
 	mux.HandleFunc("/ws/marketdata", wsSrv.HandleMarketData)
 
 	// -------------------------------------------------------
-	// 14. Start market data aggregators (1m and 5m)
+	// 14. Start market data relay and subscriptions
 	// -------------------------------------------------------
-	mdOut := make(chan marketdata.OHLCBar, 256)
-	mdAgg1m := marketdata.NewAggregator(time.Minute, mdOut)
-	mdAgg5m := marketdata.NewAggregator(5*time.Minute, mdOut)
 
 	// Relay aggregator output to WebSocket clients.
 	go func() {
