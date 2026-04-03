@@ -7,8 +7,11 @@ from decimal import Decimal
 import numpy as np
 import pandas as pd
 
+import time as _time
+
 from risk_engine.domain.position import Position
 from risk_engine.domain.risk_result import VaRResult
+from risk_engine.metrics import var_computation_seconds
 
 
 class HistoricalVaR:
@@ -46,6 +49,20 @@ class HistoricalVaR:
         5. VaR  = -percentile(portfolio_returns, 1 - confidence)
         6. CVaR = -mean(portfolio_returns below VaR threshold)
         """
+        _start = _time.monotonic()
+        try:
+            return self._compute_inner(positions, returns_matrix, base_currency)
+        finally:
+            var_computation_seconds.labels(method="historical").observe(
+                _time.monotonic() - _start
+            )
+
+    def _compute_inner(
+        self,
+        positions: dict[str, Position],
+        returns_matrix: pd.DataFrame,
+        base_currency: str = "USD",
+    ) -> VaRResult:
         # Handle empty portfolio
         if not positions:
             return VaRResult(

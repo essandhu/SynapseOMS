@@ -17,6 +17,7 @@ import structlog
 
 from risk_engine.domain.portfolio import Portfolio
 from risk_engine.domain.position import Position
+from risk_engine.metrics import pretrade_check_rejected_total, pretrade_check_seconds
 from risk_engine.var.parametric import ParametricVaR
 
 logger = structlog.get_logger()
@@ -116,7 +117,11 @@ class RiskGateServicer:
                 reject_reason = check["message"]
                 break
 
-        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        elapsed = time.monotonic() - start_time
+        elapsed_ms = int(elapsed * 1000)
+        pretrade_check_seconds.observe(elapsed)
+        if not approved:
+            pretrade_check_rejected_total.inc()
         log.info("risk_check_completed", approved=approved, elapsed_ms=elapsed_ms)
 
         # Build protobuf response (fall back gracefully if stubs not generated)

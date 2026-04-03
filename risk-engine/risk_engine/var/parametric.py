@@ -11,12 +11,15 @@ from __future__ import annotations
 from decimal import Decimal
 from math import sqrt
 
+import time as _time
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
 from risk_engine.domain.position import Position
 from risk_engine.domain.risk_result import VaRResult
+from risk_engine.metrics import var_computation_seconds
 from risk_engine.timeseries.covariance import ledoit_wolf_shrinkage, sample_covariance
 
 
@@ -58,6 +61,20 @@ class ParametricVaR:
         6. VaR  = z_{alpha} * portfolio_std * portfolio_value.
         7. CVaR = portfolio_value * portfolio_std * phi(z_{alpha}) / (1 - alpha).
         """
+        _start = _time.monotonic()
+        try:
+            return self._compute_inner(positions, returns_matrix, base_currency)
+        finally:
+            var_computation_seconds.labels(method="parametric").observe(
+                _time.monotonic() - _start
+            )
+
+    def _compute_inner(
+        self,
+        positions: dict[str, Position],
+        returns_matrix: pd.DataFrame,
+        base_currency: str = "USD",
+    ) -> VaRResult:
         # Handle empty portfolio
         if not positions:
             return VaRResult(
