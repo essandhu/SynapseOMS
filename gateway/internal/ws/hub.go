@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/synapse-oms/gateway/internal/domain"
 	"github.com/synapse-oms/gateway/internal/logging"
+	"github.com/synapse-oms/gateway/internal/metrics"
 )
 
 // StreamType identifies the type of WebSocket stream.
@@ -161,6 +162,7 @@ func (h *Hub) register(c *client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[c] = struct{}{}
+	metrics.ActiveWebSocketConnections.Inc()
 	h.logger.Info("client connected",
 		slog.String("stream", string(c.stream)),
 		slog.String("remote", c.conn.RemoteAddr().String()),
@@ -174,6 +176,7 @@ func (h *Hub) unregister(c *client) {
 	if _, ok := h.clients[c]; ok {
 		delete(h.clients, c)
 		close(c.send)
+		metrics.ActiveWebSocketConnections.Dec()
 		h.logger.Info("client disconnected",
 			slog.String("stream", string(c.stream)),
 			slog.String("remote", c.conn.RemoteAddr().String()),

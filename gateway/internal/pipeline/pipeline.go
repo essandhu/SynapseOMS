@@ -15,6 +15,7 @@ import (
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
 	"github.com/synapse-oms/gateway/internal/logging"
+	"github.com/synapse-oms/gateway/internal/metrics"
 	"github.com/synapse-oms/gateway/internal/router"
 )
 
@@ -579,6 +580,7 @@ func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityPro
 			}
 			order := vo.order
 
+			submitStart := time.Now()
 			_, err := venue.SubmitOrder(ctx, order)
 			if err != nil {
 				p.logger.Error("venue rejected order",
@@ -607,6 +609,10 @@ func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityPro
 				)
 				continue
 			}
+
+			venueLatency := time.Since(submitStart)
+			metrics.OrdersSubmittedTotal.WithLabelValues(assetClassLabel(order.AssetClass), venue.VenueID()).Inc()
+			metrics.VenueLatencySeconds.WithLabelValues(venue.VenueID()).Observe(venueLatency.Seconds())
 
 			p.logger.Info("order acknowledged",
 				slog.String("order_id", string(order.ID)),
@@ -667,6 +673,8 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 		)
 		return
 	}
+
+	metrics.FillsReceivedTotal.WithLabelValues(fill.VenueID, "venue").Inc()
 
 	// Update the order in the store
 	if err := p.store.UpdateOrder(ctx, order); err != nil {
@@ -742,6 +750,18 @@ func (p *Pipeline) notifyOrderUpdate(ctx context.Context, order *domain.Order) {
 				slog.String("error", err.Error()),
 			)
 		}
+	}
+}
+
+// assetClassLabel returns a Prometheus-friendly label for an asset class.
+func assetClassLabel(ac domain.AssetClass) string {
+	switch ac {
+	case domain.AssetClassEquity:
+		return "equity"
+	case domain.AssetClassCrypto:
+		return "crypto"
+	default:
+		return "other"
 	}
 }
 
