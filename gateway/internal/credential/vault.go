@@ -10,21 +10,39 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// Argon2id parameters per specification.
 const (
-	argonTime    = 1
-	argonMemory  = 64 * 1024 // 64 MB
-	argonThreads = 4
-	argonKeyLen  = 32 // 256-bit key
-
 	saltLen  = 16
 	nonceLen = 12
 )
 
-// deriveKey derives a 256-bit encryption key from the passphrase and salt
-// using Argon2id.
+// KDFParams holds configurable Argon2id key derivation parameters.
+type KDFParams struct {
+	Time    uint32 // number of iterations
+	Memory  uint32 // memory in KB
+	Threads uint8  // parallelism
+	KeyLen  uint32 // derived key length in bytes
+}
+
+// DefaultKDFParams returns the default Argon2id parameters.
+func DefaultKDFParams() KDFParams {
+	return KDFParams{Time: 1, Memory: 64 * 1024, Threads: 4, KeyLen: 32}
+}
+
+// deriveKeyWithParams derives an encryption key using configurable params.
+func deriveKeyWithParams(passphrase string, salt []byte, params KDFParams) []byte {
+	return argon2.IDKey([]byte(passphrase), salt, params.Time, params.Memory, params.Threads, params.KeyLen)
+}
+
+// deriveKey derives a 256-bit encryption key using default parameters.
 func deriveKey(passphrase string, salt []byte) []byte {
-	return argon2.IDKey([]byte(passphrase), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	return deriveKeyWithParams(passphrase, salt, DefaultKDFParams())
+}
+
+// ZeroBytes overwrites a byte slice with zeros.
+func ZeroBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }
 
 // encrypt encrypts plaintext using AES-256-GCM with a random nonce.
