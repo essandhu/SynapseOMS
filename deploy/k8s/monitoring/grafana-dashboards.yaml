@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: synapse-oms
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.1.0
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: synapse
+          volumeMounts:
+            - name: dashboards-config
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yml
+              subPath: dashboards.yml
+            - name: datasources-config
+              mountPath: /etc/grafana/provisioning/datasources/datasources.yml
+              subPath: datasources.yml
+            - name: system-overview
+              mountPath: /etc/grafana/provisioning/dashboards/system-overview.json
+              subPath: system-overview.json
+            - name: venue-performance
+              mountPath: /etc/grafana/provisioning/dashboards/venue-performance.json
+              subPath: venue-performance.json
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: dashboards-config
+          configMap:
+            name: grafana-config
+            items:
+              - key: dashboards.yml
+                path: dashboards.yml
+        - name: datasources-config
+          configMap:
+            name: grafana-config
+            items:
+              - key: datasources.yml
+                path: datasources.yml
+        - name: system-overview
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: system-overview.json
+                path: system-overview.json
+        - name: venue-performance
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: venue-performance.json
+                path: venue-performance.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: synapse-oms
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: http
+      name: http
+---
+# NOTE: Dashboard JSON files should be loaded into this ConfigMap.
+# For production, use: kubectl create configmap grafana-dashboards \
+#   --from-file=system-overview.json=deploy/grafana/system-overview.json \
+#   --from-file=venue-performance.json=deploy/grafana/venue-performance.json \
+#   -n synapse-oms
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: synapse-oms
+data:
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+      - name: "SynapseOMS"
+        orgId: 1
+        folder: ""
+        type: file
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
