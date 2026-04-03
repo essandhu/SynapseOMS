@@ -112,6 +112,6 @@ User enters credentials (Dashboard)
 | Want to... | Start here |
 |------------|-----------|
 | Add an exchange | [docs/write-adapter.md](write-adapter.md) |
-| Understand the codebase | [docs/architecture.md](architecture.md) (full reference) |
+| Understand the codebase | This document |
 | Set up development | [docs/quickstart.md](quickstart.md) |
 | Run tests | [CONTRIBUTING.md](../CONTRIBUTING.md) |

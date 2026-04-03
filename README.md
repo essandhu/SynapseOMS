@@ -14,8 +14,8 @@ There's no affordable tool that lets you see unified risk, execute across both t
 ## Quickstart (3 minutes)
 
 ```bash
-git clone https://github.com/your-org/synapse-oms.git
-cd synapse-oms
+git clone https://github.com/essandhu/SynapseOMS.git
+cd SynapseOMS
 cp deploy/.env.example deploy/.env
 # Edit deploy/.env — set SYNAPSE_MASTER_PASSPHRASE to a strong passphrase
 docker compose -f deploy/docker-compose.yml up
@@ -33,10 +33,6 @@ For the full step-by-step guide, see [docs/quickstart.md](docs/quickstart.md).
 - **Smart order routing** with ML venue scoring
 - **Self-hosted**: your keys never leave your machine
 - **Extensible**: add new exchanges by implementing one interface
-
-## Screenshots
-
-<!-- TODO: Add screenshots of the trading terminal -->
 
 ## Architecture
 

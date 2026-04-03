@@ -40,3 +40,31 @@ playwright-report/
 # Environment
 .env
 .env.local
+.env.production
+.env.staging
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+.nyc_output/
+
+# Keys / Certificates
+*.pem
+*.key
+*.crt
+secrets/
+certs/
+
+# Internal dev docs
+docs/phase-*-tasks.md
+docs/phase-*-review.md
+docs/planning-prompt.md
+docs/deliverables-checklist.md
+docs/final-audit.md
+docs/architecture.md
