@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Add project root (parent of both risk-engine/ and ai/) so that
+# ``from ai.execution_analyst.types import ...`` resolves when pytest
+# runs from the risk-engine/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 from decimal import Decimal
 
 import numpy as np
