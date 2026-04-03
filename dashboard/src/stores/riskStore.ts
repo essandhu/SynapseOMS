@@ -139,7 +139,6 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
   },
 
   subscribe: (): (() => void) => {
-    // Load initial risk data
     const fetchAll = () => {
       get().fetchVaR();
       get().fetchDrawdown();

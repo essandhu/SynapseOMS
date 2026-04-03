@@ -4,6 +4,7 @@ import type {
   PositionUpdate,
   VenueStatusUpdate,
   AnomalyAlert,
+  OHLCUpdate,
 } from "./types";
 
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
@@ -127,8 +128,31 @@ export function createAnomalyStream(
 }
 
 /**
+ * Creates a WebSocket connection for real-time OHLC market data updates.
+ * Automatically reconnects on disconnect.
+ */
+export function createMarketDataStream(
+  onUpdate: (update: OHLCUpdate) => void,
+): ReconnectingWebSocket {
+  const ws = new ReconnectingWebSocket(`${BASE_WS}/ws/marketdata`);
+
+  ws.addEventListener("message", (event: MessageEvent) => {
+    try {
+      const msg = JSON.parse(event.data as string);
+      if (msg.type === "ohlc_update" && msg.data) {
+        onUpdate(msg.data as OHLCUpdate);
+      }
+    } catch {
+      console.error("[ws:marketdata] Failed to parse message");
+    }
+  });
+
+  return ws;
+}
+
+/**
  * Initialize all WebSocket streams and return a cleanup function.
- * Connects order, position, risk, and venue streams simultaneously.
+ * Connects order, position, and venue streams simultaneously.
  *
  * When `onConnectionStateChange` is provided, it is called whenever any
  * stream connects, disconnects, or begins reconnecting. The UI can use

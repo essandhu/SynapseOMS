@@ -19,10 +19,11 @@ import (
 type StreamType string
 
 const (
-	StreamOrders    StreamType = "orders"
-	StreamPositions StreamType = "positions"
-	StreamVenues    StreamType = "venues"
-	StreamAnomalies StreamType = "anomalies"
+	StreamOrders     StreamType = "orders"
+	StreamPositions  StreamType = "positions"
+	StreamVenues     StreamType = "venues"
+	StreamAnomalies  StreamType = "anomalies"
+	StreamMarketData StreamType = "marketdata"
 )
 
 // Message is the JSON envelope sent to WebSocket clients.
@@ -354,6 +355,12 @@ func (h *Hub) NotifyAnomalyAlert(event AnomalyAlertEvent) {
 	}
 
 	h.broadcast(StreamAnomalies, data)
+}
+
+// BroadcastMarketData sends a pre-serialized market data message to all
+// /ws/marketdata clients. The caller is responsible for JSON marshaling.
+func (h *Hub) BroadcastMarketData(data []byte) {
+	h.broadcast(StreamMarketData, data)
 }
 
 // --- string helpers ---

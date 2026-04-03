@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BlotterView } from "./BlotterView";
 import type { Order, Instrument } from "../api/types";
 
@@ -54,6 +55,21 @@ vi.mock("../components/OrderTicket", () => ({
   OrderTicket: () => <div data-testid="order-ticket">Order Ticket</div>,
 }));
 
+vi.mock("../components/CandlestickChart", () => ({
+  CandlestickChart: ({ instrumentId }: { instrumentId: string }) => (
+    <div data-testid="candlestick-chart">Chart: {instrumentId}</div>
+  ),
+}));
+
+vi.mock("../stores/marketDataStore", () => ({
+  useMarketDataStore: (selector: (s: Record<string, unknown>) => unknown) => {
+    const state: Record<string, unknown> = {
+      subscribe: () => () => {},
+    };
+    return selector(state);
+  },
+}));
+
 describe("BlotterView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,5 +117,21 @@ describe("BlotterView", () => {
     render(<BlotterView />);
 
     expect(screen.getByText("Failed to submit order")).toBeInTheDocument();
+  });
+
+  it("shows chart panel when Chart button is clicked", async () => {
+    const user = userEvent.setup();
+    render(<BlotterView />);
+
+    // Chart panel should not be visible initially
+    expect(screen.queryByTestId("chart-panel")).not.toBeInTheDocument();
+
+    // Click the Chart toggle button
+    const toggle = screen.getByTestId("chart-toggle");
+    await user.click(toggle);
+
+    // Chart panel should now be visible
+    expect(screen.getByTestId("chart-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("candlestick-chart")).toBeInTheDocument();
   });
 });

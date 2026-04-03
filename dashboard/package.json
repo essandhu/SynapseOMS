@@ -16,6 +16,7 @@
     "ag-grid-react": "^32.0.0",
     "d3": "^7.9.0",
     "ky": "^1.0.0",
+    "lightweight-charts": "^5.1.0",
     "lucide-react": "latest",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -272,3 +272,18 @@ export interface AnomalyAlertUpdate {
   type: "anomaly_alert";
   alert: AnomalyAlert;
 }
+
+/** OHLC bar update from the gateway market data WebSocket. */
+export interface OHLCUpdate {
+  instrumentId: string;
+  venueId: string;
+  interval: "1m" | "5m";
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  periodStart: string;
+  periodEnd: string;
+  complete: boolean;
+}
