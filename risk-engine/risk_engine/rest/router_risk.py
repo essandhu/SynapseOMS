@@ -413,29 +413,17 @@ async def get_portfolio(
     portfolio: Portfolio = Depends(_get_portfolio),
 ) -> dict[str, Any]:
     """Return current portfolio state."""
-    positions_list: list[dict[str, Any]] = []
+    total_pnl = Decimal("0")
     with portfolio._lock:
         for pos in portfolio.positions.values():
-            positions_list.append({
-                "instrumentId": pos.instrument_id,
-                "venueId": pos.venue_id,
-                "quantity": str(pos.quantity),
-                "averageCost": str(pos.average_cost),
-                "marketPrice": str(pos.market_price),
-                "marketValue": str(pos.market_value),
-                "unrealizedPnl": str(pos.unrealized_pnl),
-                "realizedPnl": str(pos.realized_pnl),
-                "assetClass": pos.asset_class,
-                "settlementCycle": pos.settlement_cycle,
-            })
+            total_pnl += pos.unrealized_pnl + pos.realized_pnl
+        position_count = len(portfolio.positions)
 
         return {
-            "positions": positions_list,
-            "nav": str(portfolio.nav),
-            "cash": str(portfolio.cash),
-            "availableCash": str(portfolio.available_cash),
-            "unsettledCash": str(portfolio.unsettled_cash),
-            "updatedAt": portfolio.updated_at.isoformat().replace("+00:00", "Z"),
+            "totalNav": str(portfolio.nav),
+            "totalPnl": str(total_pnl),
+            "dailyPnl": str(total_pnl),
+            "positionCount": position_count,
         }
 
 
@@ -457,7 +445,24 @@ async def get_exposure(
                 by_venue.get(pos.venue_id, Decimal("0")) + mv
             )
 
+    total = sum(abs(v) for v in by_asset_class.values()) or Decimal("1")
+    venue_total = sum(abs(v) for v in by_venue.values()) or Decimal("1")
+
     return {
-        "byAssetClass": {k: str(v) for k, v in by_asset_class.items()},
-        "byVenue": {k: str(v) for k, v in by_venue.items()},
+        "byAssetClass": [
+            {
+                "assetClass": k,
+                "notional": str(v),
+                "percentage": float(abs(v) / total * 100),
+            }
+            for k, v in by_asset_class.items()
+        ],
+        "byVenue": [
+            {
+                "venueId": k,
+                "notional": str(v),
+                "percentage": float(abs(v) / venue_total * 100),
+            }
+            for k, v in by_venue.items()
+        ],
     }
