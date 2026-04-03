@@ -61,6 +61,11 @@ from risk_engine.rest.router_ai import (
     configure_dependencies as configure_ai_dependencies,
     router as ai_router,
 )
+from risk_engine.rest.router_scenario import (
+    ScenarioDependencies,
+    configure_dependencies as configure_scenario_dependencies,
+    router as scenario_router,
+)
 
 # ---------------------------------------------------------------------------
 # Structlog configuration — JSON output with correlation-ID support
@@ -162,6 +167,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         concentration_analyzer=concentration_analyzer,
     )
     configure_dependencies(deps)
+
+    # 1a-2. Configure scenario dependencies ---------------------------------
+    scenario_deps = ScenarioDependencies(
+        portfolio=portfolio,
+        historical_var=historical_var,
+        parametric_var=parametric_var,
+        monte_carlo_var=monte_carlo_var,
+    )
+    configure_scenario_dependencies(scenario_deps)
 
     # 1b. Configure optimizer dependencies ----------------------------------
     optimizer_deps = OptimizerDependencies(
@@ -292,6 +306,7 @@ app.include_router(risk_router)
 app.include_router(optimizer_router)
 app.include_router(anomaly_router)
 app.include_router(ai_router)
+app.include_router(scenario_router)
 
 # Mount Prometheus metrics endpoint
 app.mount("/metrics", _make_metrics_app())
