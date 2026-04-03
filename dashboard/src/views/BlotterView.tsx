@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { OrderTable } from "../components/OrderTable";
 import { OrderTicket } from "../components/OrderTicket";
+import { CandlestickChart } from "../components/CandlestickChart";
 import { useOrderStore } from "../stores/orderStore";
 import { useVenueStore } from "../stores/venueStore";
+import { useMarketDataStore } from "../stores/marketDataStore";
 import { fetchInstruments } from "../api/rest";
 import type { Instrument, OrderStatus } from "../api/types";
 
@@ -32,12 +34,22 @@ export function BlotterView() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [ticketOpen, setTicketOpen] = useState(true);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [chartInstrument, setChartInstrument] = useState("AAPL");
+  const subscribeMarketData = useMarketDataStore((s) => s.subscribe);
 
   // Subscribe to WebSocket and load initial orders
   useEffect(() => {
     const unsubscribe = subscribe();
     return unsubscribe;
   }, [subscribe]);
+
+  // Subscribe to market data WebSocket when chart is open
+  useEffect(() => {
+    if (!chartOpen) return;
+    const unsub = subscribeMarketData();
+    return unsub;
+  }, [chartOpen, subscribeMarketData]);
 
   // Load instruments and venues for the order ticket
   useEffect(() => {
@@ -105,6 +117,13 @@ export function BlotterView() {
               <span className="font-mono text-xs text-text-muted">Loading...</span>
             )}
             <button
+              onClick={() => setChartOpen((v) => !v)}
+              className="rounded border border-border px-2 py-1 font-mono text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
+              data-testid="chart-toggle"
+            >
+              {chartOpen ? "Hide Chart" : "Chart"}
+            </button>
+            <button
               onClick={() => setTicketOpen((v) => !v)}
               className="rounded border border-border px-2 py-1 font-mono text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
             >
@@ -117,6 +136,37 @@ export function BlotterView() {
         {error && (
           <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
             {error}
+          </div>
+        )}
+
+        {/* Candlestick chart panel */}
+        {chartOpen && (
+          <div
+            className="shrink-0 rounded border border-border"
+            style={{ height: 280 }}
+            data-testid="chart-panel"
+          >
+            <div className="flex items-center gap-2 border-b border-border px-3 py-1">
+              <span className="font-mono text-xs text-text-muted">Chart:</span>
+              <select
+                value={chartInstrument}
+                onChange={(e) => setChartInstrument(e.target.value)}
+                className="rounded border border-border bg-bg-secondary px-2 py-0.5 font-mono text-xs text-text-primary"
+              >
+                {instruments.length > 0 ? (
+                  instruments.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.symbol}
+                    </option>
+                  ))
+                ) : (
+                  <option value="AAPL">AAPL</option>
+                )}
+              </select>
+            </div>
+            <div style={{ height: 248 }}>
+              <CandlestickChart instrumentId={chartInstrument} />
+            </div>
           </div>
         )}
 

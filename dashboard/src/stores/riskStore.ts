@@ -14,8 +14,6 @@ import {
   fetchGreeks as apiFetchGreeks,
   fetchConcentration as apiFetchConcentration,
 } from "../api/rest";
-import { createRiskStream } from "../api/ws";
-import type ReconnectingWebSocket from "reconnecting-websocket";
 
 export interface RiskStoreState {
   /** Current VaR metrics */
@@ -141,24 +139,21 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
   },
 
   subscribe: (): (() => void) => {
-    // Load initial risk data
-    get().fetchVaR();
-    get().fetchDrawdown();
-    get().fetchSettlement();
-    get().fetchGreeks();
-    get().fetchConcentration();
+    const fetchAll = () => {
+      get().fetchVaR();
+      get().fetchDrawdown();
+      get().fetchSettlement();
+      get().fetchGreeks();
+      get().fetchConcentration();
+    };
 
-    // Connect WebSocket for real-time updates
-    let ws: ReconnectingWebSocket | null = createRiskStream((update) => {
-      get().applyUpdate(update);
-    });
+    fetchAll();
 
-    // Return unsubscribe function
+    // Poll risk data every 30 seconds (risk engine is REST-only, no WebSocket)
+    const interval = setInterval(fetchAll, 30_000);
+
     return () => {
-      if (ws) {
-        ws.close();
-        ws = null;
-      }
+      clearInterval(interval);
     };
   },
 }));

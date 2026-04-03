@@ -49,6 +49,7 @@ type Adapter struct {
 	status      adapter.VenueStatus
 	logger      *slog.Logger
 	mdCh        chan adapter.MarketDataSnapshot
+	mdStopCh    chan struct{}
 }
 
 // NewAdapter creates a new simulated exchange adapter.
@@ -211,15 +212,54 @@ func (a *Adapter) SubscribeMarketData(_ context.Context, _ []string) (<-chan ada
 		return nil, fmt.Errorf("simulated exchange not connected")
 	}
 
-	// Return a buffered channel; the simulated exchange does not actively push
-	// market data snapshots yet, but the channel is ready for future use.
 	ch := make(chan adapter.MarketDataSnapshot, 100)
 	a.mdCh = ch
+	a.mdStopCh = make(chan struct{})
+
+	// Start a goroutine that pushes price snapshots for all instruments
+	// every 500ms, matching the price walk tick rate.
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		spread := decimal.NewFromFloat(0.02)
+
+		for {
+			select {
+			case <-a.mdStopCh:
+				return
+			case <-ticker.C:
+				for _, id := range a.engine.InstrumentIDs() {
+					price, ok := a.engine.GetPrice(id)
+					if !ok {
+						continue
+					}
+					halfSpread := price.Mul(spread).Div(decimal.NewFromInt(2))
+					snap := adapter.MarketDataSnapshot{
+						InstrumentID: id,
+						VenueID:      venueID,
+						LastPrice:    price,
+						BidPrice:     price.Sub(halfSpread),
+						AskPrice:     price.Add(halfSpread),
+						Timestamp:    time.Now(),
+					}
+					select {
+					case ch <- snap:
+					default:
+						// Drop if channel full
+					}
+				}
+			}
+		}
+	}()
+
 	return ch, nil
 }
 
 func (a *Adapter) UnsubscribeMarketData(_ context.Context, _ []string) error {
-	// No-op for simulated exchange.
+	if a.mdStopCh != nil {
+		close(a.mdStopCh)
+		a.mdStopCh = nil
+	}
 	return nil
 }
 

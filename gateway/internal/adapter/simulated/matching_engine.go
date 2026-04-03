@@ -64,6 +64,17 @@ func (me *MatchingEngine) Stop() {
 	}
 }
 
+// InstrumentIDs returns all registered instrument IDs.
+func (me *MatchingEngine) InstrumentIDs() []string {
+	me.mu.RLock()
+	defer me.mu.RUnlock()
+	ids := make([]string, 0, len(me.priceWalks))
+	for id := range me.priceWalks {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // GetPrice returns the current synthetic price for an instrument.
 func (me *MatchingEngine) GetPrice(instrumentID string) (decimal.Decimal, bool) {
 	me.mu.RLock()

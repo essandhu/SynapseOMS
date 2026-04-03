@@ -69,6 +69,11 @@ func (s *Server) HandleAnomalies(w http.ResponseWriter, r *http.Request) {
 	s.serveWS(w, r, StreamAnomalies)
 }
 
+// HandleMarketData upgrades the connection for /ws/marketdata streaming.
+func (s *Server) HandleMarketData(w http.ResponseWriter, r *http.Request) {
+	s.serveWS(w, r, StreamMarketData)
+}
+
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request, stream StreamType) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
 	"github.com/synapse-oms/gateway/internal/kafka"
+	"github.com/synapse-oms/gateway/internal/marketdata"
 	"github.com/synapse-oms/gateway/internal/logging"
 	"github.com/synapse-oms/gateway/internal/pipeline"
 	"github.com/synapse-oms/gateway/internal/rest"
@@ -355,9 +357,79 @@ func main() {
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
 	mux.HandleFunc("/ws/venues", wsSrv.HandleVenues)
 	mux.HandleFunc("/ws/anomalies", wsSrv.HandleAnomalies)
+	mux.HandleFunc("/ws/marketdata", wsSrv.HandleMarketData)
 
 	// -------------------------------------------------------
-	// 14. Start HTTP server
+	// 14. Start market data aggregator
+	// -------------------------------------------------------
+	mdOut := make(chan marketdata.OHLCBar, 256)
+	mdAgg := marketdata.NewAggregator(time.Minute, mdOut)
+
+	// Relay aggregator output to WebSocket clients.
+	go func() {
+		for bar := range mdOut {
+			msg := map[string]interface{}{
+				"type": "ohlc_update",
+				"data": map[string]interface{}{
+					"instrumentId": bar.InstrumentID,
+					"venueId":      bar.VenueID,
+					"interval":     "1m",
+					"open":         bar.Open.String(),
+					"high":         bar.High.String(),
+					"low":          bar.Low.String(),
+					"close":        bar.Close.String(),
+					"volume":       bar.Volume.String(),
+					"periodStart":  bar.PeriodStart.Format(time.RFC3339),
+					"periodEnd":    bar.PeriodEnd.Format(time.RFC3339),
+					"complete":     bar.Complete,
+				},
+			}
+			data, err := json.Marshal(msg)
+			if err != nil {
+				logger.Error("failed to marshal OHLC bar", slog.String("error", err.Error()))
+				continue
+			}
+			hub.BroadcastMarketData(data)
+		}
+	}()
+
+	// Flush partial bars every 5 seconds for real-time chart updates.
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				mdAgg.Flush()
+			}
+		}
+	}()
+
+	// Subscribe to market data from all connected adapters and feed to aggregator.
+	for _, v := range venues {
+		if v.Status() != adapter.Connected {
+			continue
+		}
+		mdChan, err := v.SubscribeMarketData(ctx, nil)
+		if err != nil {
+			logger.Warn("failed to subscribe to market data",
+				slog.String("venue", v.VenueID()),
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+		go func(ch <-chan adapter.MarketDataSnapshot, vid string) {
+			for snap := range ch {
+				mdAgg.Ingest(snap)
+			}
+		}(mdChan, v.VenueID())
+		logger.Info("subscribed to market data", slog.String("venue", v.VenueID()))
+	}
+
+	// -------------------------------------------------------
+	// 15. Start HTTP server
 	// -------------------------------------------------------
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
