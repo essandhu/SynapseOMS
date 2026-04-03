@@ -56,8 +56,8 @@ vi.mock("../components/OrderTicket", () => ({
 }));
 
 vi.mock("../components/CandlestickChart", () => ({
-  CandlestickChart: ({ instrumentId }: { instrumentId: string }) => (
-    <div data-testid="candlestick-chart">Chart: {instrumentId}</div>
+  CandlestickChart: ({ instrumentId, interval }: { instrumentId: string; interval?: string }) => (
+    <div data-testid="candlestick-chart">Chart: {instrumentId} ({interval || "1m"})</div>
   ),
 }));
 
@@ -133,5 +133,28 @@ describe("BlotterView", () => {
     // Chart panel should now be visible
     expect(screen.getByTestId("chart-panel")).toBeInTheDocument();
     expect(screen.getByTestId("candlestick-chart")).toBeInTheDocument();
+  });
+
+  it("toggles chart interval between 1m and 5m", async () => {
+    const user = userEvent.setup();
+    render(<BlotterView />);
+
+    // Open the chart panel
+    await user.click(screen.getByTestId("chart-toggle"));
+
+    // Default interval should be 1m
+    expect(screen.getByTestId("candlestick-chart")).toHaveTextContent("(1m)");
+    expect(screen.getByTestId("interval-1m")).toBeInTheDocument();
+    expect(screen.getByTestId("interval-5m")).toBeInTheDocument();
+
+    // Click 5m interval button
+    await user.click(screen.getByTestId("interval-5m"));
+
+    // Chart should now show 5m interval
+    expect(screen.getByTestId("candlestick-chart")).toHaveTextContent("(5m)");
+
+    // Click 1m to go back
+    await user.click(screen.getByTestId("interval-1m"));
+    expect(screen.getByTestId("candlestick-chart")).toHaveTextContent("(1m)");
   });
 });
