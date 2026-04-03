@@ -67,12 +67,12 @@
 - [x] risk_engine/anomaly/detector.py (Isolation Forest streaming anomaly detector — 11 tests)
 - [x] risk_engine/timeseries/statistics.py (Rolling statistics)
 - [x] risk_engine/timeseries/covariance.py (Covariance matrix computation, Ledoit-Wolf shrinkage)
-- [x] ~~risk_engine/timeseries/regime.py~~ — DEFERRED: regime detection is a future enhancement for market-regime-aware VaR
+- [x] risk_engine/timeseries/regime.py (RegimeDetector: BULL/BEAR/CRISIS classification from return series — 10 tests)
 - [x] risk_engine/kafka/consumer.py (Kafka consumer for order-lifecycle topic, portfolio state builder)
 - [x] risk_engine/grpc_server/server.py (gRPC server: CheckPreTradeRisk with 4 risk checks)
 - [x] risk_engine/rest/router_risk.py (REST: VaR, drawdown, settlement, portfolio, exposure)
 - [x] risk_engine/rest/router_optimizer.py (REST: portfolio optimization)
-- [x] ~~risk_engine/rest/router_scenario.py~~ — DEFERRED: what-if scenario analysis is a future enhancement
+- [x] risk_engine/rest/router_scenario.py (REST: POST /api/v1/risk/scenario — what-if VaR analysis — 6 tests)
 - [x] risk_engine/pyproject.toml (pip project config with all dependencies)
 - [x] ~~risk_engine/requirements.lock~~ — SUPERSEDED: pyproject.toml with pinned version ranges is the dependency source of truth
 - [x] risk-engine/Dockerfile
@@ -164,7 +164,7 @@
 ## CI/CD
 
 - [x] .github/workflows/ci.yml (build + test all services: Go, Python, TypeScript — runs on PR to main)
-- [x] ~~.github/workflows/release.yml~~ — DEFERRED: Docker image release automation is a post-launch concern
+- [x] .github/workflows/release.yml (Docker image release: builds gateway, risk-engine, dashboard and pushes to GHCR on tag)
 
 ## Tests
 
@@ -197,7 +197,7 @@
 - [x] dashboard/src/components/OrderTicket.test.tsx (order ticket component tests)
 - [x] gateway/integration_test.go (order -> risk check -> route -> fill -> position flow)
 - [x] gateway/internal/adapter/contract_test.go (AdapterContractSuite shared contract tests — 21 subtests)
-- [x] ~~E2E: connect venue -> submit order -> see fill -> check risk (Playwright)~~ — DEFERRED: acceptance script (scripts/acceptance-test.sh) covers happy path via curl; browser E2E to be added
-- [x] ~~E2E: multi-venue portfolio unified view (Playwright)~~ — DEFERRED: requires real or mocked venue connections
-- [x] ~~E2E: order cancellation flow (Playwright)~~ — DEFERRED: cancellation tested at unit/integration level
+- [x] E2E: order flow (Playwright) — e2e/order-flow.spec.ts: onboarding → submit order → fill → risk dashboard
+- [x] E2E: multi-venue portfolio (Playwright) — e2e/multi-venue-portfolio.spec.ts: equity + crypto orders → unified portfolio
+- [x] E2E: order cancellation (Playwright) — e2e/order-cancellation.spec.ts: limit order → acknowledged → cancel → canceled
 - [x] ~~gateway/internal/pipeline/pipeline_bench_test.go~~ — SUPERSEDED: performance benchmarking covered by k6 load test scripts (loadtest/k6/order_flow.js)
