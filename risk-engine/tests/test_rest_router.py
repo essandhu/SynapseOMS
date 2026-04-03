@@ -105,69 +105,80 @@ def empty_client() -> TestClient:
 class TestPortfolioEndpoint:
     """Tests for GET /api/v1/portfolio."""
 
-    def test_get_portfolio_returns_positions(self, client: TestClient) -> None:
-        """Should return portfolio with positions, cash, and NAV."""
+    def test_get_portfolio_returns_summary(self, client: TestClient) -> None:
+        """Should return portfolio summary with NAV, PnL, and position count."""
         resp = client.get("/api/v1/portfolio")
         assert resp.status_code == 200
 
         data = resp.json()
-        assert "positions" in data
-        assert "nav" in data
-        assert "cash" in data
-        assert "availableCash" in data
-        assert len(data["positions"]) == 3  # AAPL, BTC-USD, ETH-USD
+        assert "totalNav" in data
+        assert "totalPnl" in data
+        assert "dailyPnl" in data
+        assert "positionCount" in data
+        assert data["positionCount"] == 3  # AAPL, BTC-USD, ETH-USD
 
-    def test_get_portfolio_position_fields(self, client: TestClient) -> None:
-        """Each position should contain the expected fields."""
+    def test_get_portfolio_nav_is_decimal_string(self, client: TestClient) -> None:
+        """NAV and PnL values should be decimal strings."""
         resp = client.get("/api/v1/portfolio")
         data = resp.json()
 
-        aapl = next(p for p in data["positions"] if p["instrumentId"] == "AAPL")
-        assert aapl["quantity"] == "100"
-        assert aapl["assetClass"] == "equity"
-        assert aapl["settlementCycle"] == "T2"
-        assert "marketValue" in aapl
-        assert "unrealizedPnl" in aapl
+        # Values should be parseable as decimals
+        float(data["totalNav"])
+        float(data["totalPnl"])
+        float(data["dailyPnl"])
 
     def test_get_portfolio_empty(self, empty_client: TestClient) -> None:
         """Empty portfolio should return zero positions."""
         resp = empty_client.get("/api/v1/portfolio")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["positions"] == []
+        assert data["positionCount"] == 0
 
 
 class TestExposureEndpoint:
     """Tests for GET /api/v1/portfolio/exposure."""
 
     def test_get_exposure_returns_breakdown(self, client: TestClient) -> None:
-        """Should return exposure by asset class and venue."""
+        """Should return exposure by asset class and venue as arrays."""
         resp = client.get("/api/v1/portfolio/exposure")
         assert resp.status_code == 200
 
         data = resp.json()
         assert "byAssetClass" in data
         assert "byVenue" in data
+        assert isinstance(data["byAssetClass"], list)
+        assert isinstance(data["byVenue"], list)
 
         # We have equity (AAPL) and crypto (BTC-USD, ETH-USD) positions
-        assert "equity" in data["byAssetClass"]
-        assert "crypto" in data["byAssetClass"]
+        asset_classes = {e["assetClass"] for e in data["byAssetClass"]}
+        assert "equity" in asset_classes
+        assert "crypto" in asset_classes
+
+        # Each entry should have notional and percentage
+        for entry in data["byAssetClass"]:
+            assert "notional" in entry
+            assert "percentage" in entry
 
     def test_get_exposure_by_venue(self, client: TestClient) -> None:
         """Should break down exposure by venue."""
         resp = client.get("/api/v1/portfolio/exposure")
         data = resp.json()
 
-        assert "NYSE" in data["byVenue"]
-        assert "COINBASE" in data["byVenue"]
+        venue_ids = {e["venueId"] for e in data["byVenue"]}
+        assert "NYSE" in venue_ids
+        assert "COINBASE" in venue_ids
+
+        for entry in data["byVenue"]:
+            assert "notional" in entry
+            assert "percentage" in entry
 
     def test_get_exposure_empty_portfolio(self, empty_client: TestClient) -> None:
         """Empty portfolio should return empty breakdown."""
         resp = empty_client.get("/api/v1/portfolio/exposure")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["byAssetClass"] == {}
-        assert data["byVenue"] == {}
+        assert data["byAssetClass"] == []
+        assert data["byVenue"] == []
 
 
 # ---------------------------------------------------------------------------
