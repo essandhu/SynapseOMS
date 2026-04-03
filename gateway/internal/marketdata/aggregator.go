@@ -22,6 +22,7 @@ type OHLCBar struct {
 	PeriodEnd    time.Time
 	TickCount    int
 	Complete     bool
+	Interval     string
 }
 
 // Aggregator collects MarketDataSnapshot ticks and produces OHLC bars.

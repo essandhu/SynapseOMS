@@ -57,6 +57,7 @@ type MarketDataSnapshot struct {
 	AskPrice     decimal.Decimal
 	LastPrice    decimal.Decimal
 	Volume24h    decimal.Decimal
+	TickVolume   decimal.Decimal
 	Timestamp    time.Time
 }
 

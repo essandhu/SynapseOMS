@@ -203,6 +203,115 @@ func TestPeriodStartAlignedToInterval(t *testing.T) {
 	}
 }
 
+func tickWithVolume(instrumentID string, price, volume float64, ts time.Time) adapter.MarketDataSnapshot {
+	p := decimal.NewFromFloat(price)
+	return adapter.MarketDataSnapshot{
+		InstrumentID: instrumentID,
+		VenueID:      "test-venue",
+		LastPrice:    p,
+		BidPrice:     p.Sub(decimal.NewFromFloat(0.01)),
+		AskPrice:     p.Add(decimal.NewFromFloat(0.01)),
+		TickVolume:   decimal.NewFromFloat(volume),
+		Timestamp:    ts,
+	}
+}
+
+func TestVolumeAccumulation(t *testing.T) {
+	out := make(chan OHLCBar, 10)
+	agg := NewAggregator(time.Minute, out)
+
+	base := time.Date(2026, 4, 2, 10, 0, 0, 0, time.UTC)
+	agg.Ingest(tickWithVolume("AAPL", 150.0, 100.0, base))
+	agg.Ingest(tickWithVolume("AAPL", 151.0, 200.0, base.Add(10*time.Second)))
+	agg.Ingest(tickWithVolume("AAPL", 152.0, 300.0, base.Add(20*time.Second)))
+
+	bar := agg.CurrentBar("AAPL")
+	if bar == nil {
+		t.Fatal("expected current bar")
+	}
+
+	expectedVolume := decimal.NewFromFloat(600.0)
+	if !bar.Volume.Equal(expectedVolume) {
+		t.Errorf("volume = %s, want %s", bar.Volume, expectedVolume)
+	}
+}
+
+func TestIntervalFieldOnEmittedBar(t *testing.T) {
+	out := make(chan OHLCBar, 10)
+	agg := NewAggregator(time.Minute, out)
+
+	// Tick in minute 10:00
+	base := time.Date(2026, 4, 2, 10, 0, 30, 0, time.UTC)
+	agg.Ingest(tick("AAPL", 150.0, base))
+
+	// Tick in minute 10:01 — triggers rollover
+	next := time.Date(2026, 4, 2, 10, 1, 5, 0, time.UTC)
+	agg.Ingest(tick("AAPL", 155.0, next))
+
+	select {
+	case completed := <-out:
+		if completed.Interval != "1m" {
+			t.Errorf("interval = %q, want %q", completed.Interval, "1m")
+		}
+	default:
+		t.Fatal("expected a completed bar on the output channel")
+	}
+
+	// Also check current bar has interval set
+	bar := agg.CurrentBar("AAPL")
+	if bar == nil {
+		t.Fatal("expected current bar")
+	}
+	if bar.Interval != "1m" {
+		t.Errorf("current bar interval = %q, want %q", bar.Interval, "1m")
+	}
+}
+
+func Test5mIntervalRollover(t *testing.T) {
+	out := make(chan OHLCBar, 10)
+	agg := NewAggregator(5*time.Minute, out)
+
+	// Tick in period 10:00-10:05
+	base := time.Date(2026, 4, 2, 10, 2, 0, 0, time.UTC)
+	agg.Ingest(tickWithVolume("AAPL", 150.0, 50.0, base))
+	agg.Ingest(tickWithVolume("AAPL", 151.0, 75.0, base.Add(time.Minute)))
+
+	// Tick in period 10:05-10:10 — triggers rollover
+	next := time.Date(2026, 4, 2, 10, 6, 0, 0, time.UTC)
+	agg.Ingest(tickWithVolume("AAPL", 155.0, 100.0, next))
+
+	select {
+	case completed := <-out:
+		if completed.Interval != "5m" {
+			t.Errorf("interval = %q, want %q", completed.Interval, "5m")
+		}
+		if !completed.Complete {
+			t.Error("expected Complete=true")
+		}
+		expectedVolume := decimal.NewFromFloat(125.0)
+		if !completed.Volume.Equal(expectedVolume) {
+			t.Errorf("volume = %s, want %s", completed.Volume, expectedVolume)
+		}
+		if completed.TickCount != 2 {
+			t.Errorf("tick count = %d, want 2", completed.TickCount)
+		}
+	default:
+		t.Fatal("expected a completed bar on the output channel")
+	}
+
+	// New bar should have the new tick's volume
+	bar := agg.CurrentBar("AAPL")
+	if bar == nil {
+		t.Fatal("expected new current bar")
+	}
+	if bar.Interval != "5m" {
+		t.Errorf("new bar interval = %q, want %q", bar.Interval, "5m")
+	}
+	if !bar.Volume.Equal(decimal.NewFromFloat(100.0)) {
+		t.Errorf("new bar volume = %s, want 100", bar.Volume)
+	}
+}
+
 func drainChannel(ch <-chan OHLCBar, max int) []OHLCBar {
 	var bars []OHLCBar
 	for i := 0; i < max; i++ {
