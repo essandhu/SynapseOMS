@@ -360,10 +360,11 @@ func main() {
 	mux.HandleFunc("/ws/marketdata", wsSrv.HandleMarketData)
 
 	// -------------------------------------------------------
-	// 14. Start market data aggregator
+	// 14. Start market data aggregators (1m and 5m)
 	// -------------------------------------------------------
 	mdOut := make(chan marketdata.OHLCBar, 256)
-	mdAgg := marketdata.NewAggregator(time.Minute, mdOut)
+	mdAgg1m := marketdata.NewAggregator(time.Minute, mdOut)
+	mdAgg5m := marketdata.NewAggregator(5*time.Minute, mdOut)
 
 	// Relay aggregator output to WebSocket clients.
 	go func() {
@@ -373,7 +374,7 @@ func main() {
 				"data": map[string]interface{}{
 					"instrumentId": bar.InstrumentID,
 					"venueId":      bar.VenueID,
-					"interval":     "1m",
+					"interval":     bar.Interval,
 					"open":         bar.Open.String(),
 					"high":         bar.High.String(),
 					"low":          bar.Low.String(),
@@ -402,12 +403,13 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				mdAgg.Flush()
+				mdAgg1m.Flush()
+				mdAgg5m.Flush()
 			}
 		}
 	}()
 
-	// Subscribe to market data from all connected adapters and feed to aggregator.
+	// Subscribe to market data from all connected adapters and feed to both aggregators.
 	for _, v := range venues {
 		if v.Status() != adapter.Connected {
 			continue
@@ -422,7 +424,8 @@ func main() {
 		}
 		go func(ch <-chan adapter.MarketDataSnapshot, vid string) {
 			for snap := range ch {
-				mdAgg.Ingest(snap)
+				mdAgg1m.Ingest(snap)
+				mdAgg5m.Ingest(snap)
 			}
 		}(mdChan, v.VenueID())
 		logger.Info("subscribed to market data", slog.String("venue", v.VenueID()))
