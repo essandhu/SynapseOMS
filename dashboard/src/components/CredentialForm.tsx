@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Loader2, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft,
+  Shield,
+  RefreshCw,
+} from "lucide-react";
 import { useVenueStore } from "../stores/venueStore";
 
 interface CredentialFormProps {
@@ -20,12 +27,18 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
   const [apiSecret, setApiSecret] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [keyTouched, setKeyTouched] = useState(false);
+  const [secretTouched, setSecretTouched] = useState(false);
 
   const storeCredentials = useVenueStore((s) => s.storeCredentials);
   const connectVenue = useVenueStore((s) => s.connectVenue);
 
   const fields = VENUE_FIELDS[venueId] ?? { keyLabel: "API Key", secretLabel: "API Secret" };
   const canSubmit = apiKey.trim().length > 0 && apiSecret.trim().length > 0;
+
+  const keyError = keyTouched && apiKey.trim().length === 0 ? `${fields.keyLabel} is required` : null;
+  const secretError =
+    secretTouched && apiSecret.trim().length === 0 ? `${fields.secretLabel} is required` : null;
 
   async function handleTestConnection() {
     setFormState("testing");
@@ -38,7 +51,10 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
       // Brief delay so user sees the success state
       setTimeout(onSuccess, 1500);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Connection failed. Please check your credentials.";
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Connection failed. Please check your credentials.";
       setErrorMessage(message);
       setFormState("error");
     }
@@ -55,6 +71,22 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
         </p>
       </div>
 
+      {/* Security details */}
+      <div className="rounded-lg border border-accent-green/20 bg-accent-green/5 px-4 py-3">
+        <div className="flex items-start gap-3">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0 text-accent-green" />
+          <div className="text-left">
+            <p className="text-xs font-medium text-accent-green">
+              End-to-end encryption
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              Argon2id key derivation + AES-256-GCM encryption. Credentials are
+              stored locally and never transmitted to any external server.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div>
           <label
@@ -68,10 +100,19 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
+            onBlur={() => setKeyTouched(true)}
             disabled={formState === "testing" || formState === "success"}
             placeholder="Paste your key here"
-            className="w-full rounded-md border border-border bg-bg-primary px-3 py-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue disabled:opacity-50"
+            className={[
+              "w-full rounded-md border bg-bg-primary px-3 py-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-1 disabled:opacity-50",
+              keyError
+                ? "border-accent-red focus:border-accent-red focus:ring-accent-red"
+                : "border-border focus:border-accent-blue focus:ring-accent-blue",
+            ].join(" ")}
           />
+          {keyError && (
+            <p className="mt-1 font-mono text-xs text-accent-red">{keyError}</p>
+          )}
         </div>
 
         <div>
@@ -86,10 +127,19 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
             type="password"
             value={apiSecret}
             onChange={(e) => setApiSecret(e.target.value)}
+            onBlur={() => setSecretTouched(true)}
             disabled={formState === "testing" || formState === "success"}
             placeholder="Paste your secret here"
-            className="w-full rounded-md border border-border bg-bg-primary px-3 py-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue disabled:opacity-50"
+            className={[
+              "w-full rounded-md border bg-bg-primary px-3 py-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-1 disabled:opacity-50",
+              secretError
+                ? "border-accent-red focus:border-accent-red focus:ring-accent-red"
+                : "border-border focus:border-accent-blue focus:ring-accent-blue",
+            ].join(" ")}
           />
+          {secretError && (
+            <p className="mt-1 font-mono text-xs text-accent-red">{secretError}</p>
+          )}
         </div>
       </div>
 
@@ -104,11 +154,11 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
       )}
 
       {formState === "error" && (
-        <div className="flex items-center gap-2 rounded-md border border-accent-red/30 bg-accent-red/10 px-4 py-3">
-          <AlertCircle className="h-5 w-5 shrink-0 text-accent-red" />
-          <span className="text-sm text-accent-red">
-            {errorMessage}
-          </span>
+        <div className="rounded-md border border-accent-red/30 bg-accent-red/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 shrink-0 text-accent-red" />
+            <span className="text-sm text-accent-red">{errorMessage}</span>
+          </div>
         </div>
       )}
 
@@ -132,6 +182,9 @@ export function CredentialForm({ venueId, onSuccess, onBack }: CredentialFormPro
         >
           {formState === "testing" && (
             <Loader2 className="h-4 w-4 animate-spin" />
+          )}
+          {formState === "error" && (
+            <RefreshCw className="h-4 w-4" />
           )}
           {formState === "testing"
             ? "Testing Connection..."

@@ -324,6 +324,21 @@ export function OnboardingView() {
           </button>
         </div>
 
+        <div className="mt-6 rounded-lg border border-accent-green/20 bg-accent-green/5 px-5 py-3">
+          <div className="flex items-start gap-3">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0 text-accent-green" />
+            <div className="text-left">
+              <p className="text-xs font-medium text-accent-green">
+                How your credentials are protected
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                Key derivation via Argon2id (time=1, memory=64MB, parallelism=4).
+                Encryption with AES-256-GCM. Stored locally, never transmitted.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <p className="mt-4 text-center text-xs text-text-muted">
           Minimum 8 characters. Both fields must match.
         </p>
@@ -475,14 +490,24 @@ export function OnboardingView() {
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={finishOnboarding}
-          className="mt-10 flex items-center gap-2 rounded-lg bg-accent-green px-8 py-3 font-mono text-sm font-semibold text-white shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all hover:bg-accent-green/90 hover:shadow-[0_0_24px_rgba(34,197,94,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-green/50"
-        >
-          Open Trading Terminal
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        <div className="mt-10 flex items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={goBack}
+            className="flex items-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium text-text-muted transition-colors hover:text-text-primary"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={finishOnboarding}
+            className="flex items-center gap-2 rounded-lg bg-accent-green px-8 py-3 font-mono text-sm font-semibold text-white shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all hover:bg-accent-green/90 hover:shadow-[0_0_24px_rgba(34,197,94,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+          >
+            Open Trading Terminal
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     );
   }
