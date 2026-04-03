@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 import numpy as np
 from sklearn.ensemble import IsolationForest
 
+from risk_engine.metrics import anomalies_detected_total
+
 
 @dataclass
 class AnomalyAlert:
@@ -88,6 +90,7 @@ class StreamingAnomalyDetector:
             return None  # inlier
 
         severity = self._determine_severity(score)
+        anomalies_detected_total.inc()
         feat_dict = dict(zip(_FEATURE_NAMES, features.tolist(), strict=True))
         return AnomalyAlert(
             id=str(uuid.uuid4()),

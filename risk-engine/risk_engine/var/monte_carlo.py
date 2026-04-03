@@ -17,6 +17,7 @@ from scipy.stats import t as student_t
 
 from risk_engine.domain.position import Position
 from risk_engine.domain.risk_result import VaRResult
+from risk_engine.metrics import var_computation_seconds
 
 
 # ---------------------------------------------------------------------------
@@ -103,72 +104,73 @@ class MonteCarloVaR:
             With ``var_amount``, ``cvar_amount``, and the full ``distribution``
             array of simulated portfolio P&L values.
         """
-        n_instruments = len(positions)
-        n_sims = self.num_simulations
+        with var_computation_seconds.labels(method="monte_carlo").time():
+            n_instruments = len(positions)
+            n_sims = self.num_simulations
 
-        # Market values per instrument
-        market_values = np.array(
-            [float(p.market_value) for p in positions], dtype=np.float64
-        )
+            # Market values per instrument
+            market_values = np.array(
+                [float(p.market_value) for p in positions], dtype=np.float64
+            )
 
-        # 1. Cholesky decomposition of covariance matrix --------------------
-        chol = np.linalg.cholesky(covariance_matrix)
+            # 1. Cholesky decomposition of covariance matrix --------------------
+            chol = np.linalg.cholesky(covariance_matrix)
 
-        # 2. Generate per-instrument random draws ---------------------------
-        #    Shape: (n_sims, n_instruments)
-        raw = np.empty((n_sims, n_instruments), dtype=np.float64)
-        for i, dp in enumerate(distribution_params):
-            if dp.family == "student_t":
-                if dp.df is None:
-                    raise ValueError(
-                        f"Student-t distribution requires 'df' parameter "
-                        f"(instrument index {i})"
-                    )
-                # Student-t draws scaled to unit variance:
-                # Var(t_df) = df / (df - 2), so divide by sqrt(df / (df - 2))
-                # to get unit-variance draws.
-                raw_t = student_t.rvs(df=dp.df, size=n_sims)
-                scale = sqrt(dp.df / (dp.df - 2)) if dp.df > 2 else 1.0
-                raw[:, i] = raw_t / scale
+            # 2. Generate per-instrument random draws ---------------------------
+            #    Shape: (n_sims, n_instruments)
+            raw = np.empty((n_sims, n_instruments), dtype=np.float64)
+            for i, dp in enumerate(distribution_params):
+                if dp.family == "student_t":
+                    if dp.df is None:
+                        raise ValueError(
+                            f"Student-t distribution requires 'df' parameter "
+                            f"(instrument index {i})"
+                        )
+                    # Student-t draws scaled to unit variance:
+                    # Var(t_df) = df / (df - 2), so divide by sqrt(df / (df - 2))
+                    # to get unit-variance draws.
+                    raw_t = student_t.rvs(df=dp.df, size=n_sims)
+                    scale = sqrt(dp.df / (dp.df - 2)) if dp.df > 2 else 1.0
+                    raw[:, i] = raw_t / scale
+                else:
+                    # Normal (standard Gaussian)
+                    raw[:, i] = np.random.standard_normal(n_sims)
+
+            # 3. Induce correlation via Cholesky factor -------------------------
+            #    correlated = raw @ L^T   (each row is a correlated sample)
+            correlated_returns = raw @ chol.T
+
+            # 4. Add expected returns and scale for horizon ---------------------
+            #    For multi-day horizon, scale mean by T and vol by sqrt(T).
+            horizon_factor = sqrt(self.horizon_days)
+            mean_factor = self.horizon_days
+
+            # Simulated returns: mean * T + correlated_vol * sqrt(T)
+            simulated_returns = (
+                expected_returns * mean_factor + correlated_returns * horizon_factor
+            )
+
+            # 5. Compute portfolio P&L for each simulation ---------------------
+            #    P&L_i = sum_j(market_value_j * simulated_return_j_i)
+            simulated_pnl = simulated_returns @ market_values
+
+            # 6. VaR = -percentile(simulated_pnl, 1 - confidence) ---------------
+            alpha_pct = (1.0 - self.confidence) * 100.0
+            var_amount = -float(np.percentile(simulated_pnl, alpha_pct))
+
+            # 7. CVaR = -mean(simulated_pnl below -VaR threshold) ---------------
+            threshold = -var_amount
+            tail = simulated_pnl[simulated_pnl <= threshold]
+            if len(tail) > 0:
+                cvar_amount = -float(np.mean(tail))
             else:
-                # Normal (standard Gaussian)
-                raw[:, i] = np.random.standard_normal(n_sims)
+                cvar_amount = var_amount
 
-        # 3. Induce correlation via Cholesky factor -------------------------
-        #    correlated = raw @ L^T   (each row is a correlated sample)
-        correlated_returns = raw @ chol.T
-
-        # 4. Add expected returns and scale for horizon ---------------------
-        #    For multi-day horizon, scale mean by T and vol by sqrt(T).
-        horizon_factor = sqrt(self.horizon_days)
-        mean_factor = self.horizon_days
-
-        # Simulated returns: mean * T + correlated_vol * sqrt(T)
-        simulated_returns = (
-            expected_returns * mean_factor + correlated_returns * horizon_factor
-        )
-
-        # 5. Compute portfolio P&L for each simulation ---------------------
-        #    P&L_i = sum_j(market_value_j * simulated_return_j_i)
-        simulated_pnl = simulated_returns @ market_values
-
-        # 6. VaR = -percentile(simulated_pnl, 1 - confidence) ---------------
-        alpha_pct = (1.0 - self.confidence) * 100.0
-        var_amount = -float(np.percentile(simulated_pnl, alpha_pct))
-
-        # 7. CVaR = -mean(simulated_pnl below -VaR threshold) ---------------
-        threshold = -var_amount
-        tail = simulated_pnl[simulated_pnl <= threshold]
-        if len(tail) > 0:
-            cvar_amount = -float(np.mean(tail))
-        else:
-            cvar_amount = var_amount
-
-        return VaRResult(
-            var_amount=Decimal(str(round(var_amount, 10))),
-            cvar_amount=Decimal(str(round(cvar_amount, 10))),
-            confidence=self.confidence,
-            horizon_days=self.horizon_days,
-            method="monte_carlo",
-            distribution=[float(x) for x in simulated_pnl],
-        )
+            return VaRResult(
+                var_amount=Decimal(str(round(var_amount, 10))),
+                cvar_amount=Decimal(str(round(cvar_amount, 10))),
+                confidence=self.confidence,
+                horizon_days=self.horizon_days,
+                method="monte_carlo",
+                distribution=[float(x) for x in simulated_pnl],
+            )

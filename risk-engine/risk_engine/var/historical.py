@@ -9,6 +9,7 @@ import pandas as pd
 
 from risk_engine.domain.position import Position
 from risk_engine.domain.risk_result import VaRResult
+from risk_engine.metrics import var_computation_seconds
 
 
 class HistoricalVaR:
@@ -46,54 +47,55 @@ class HistoricalVaR:
         5. VaR  = -percentile(portfolio_returns, 1 - confidence)
         6. CVaR = -mean(portfolio_returns below VaR threshold)
         """
-        # Handle empty portfolio
-        if not positions:
+        with var_computation_seconds.labels(method="historical").time():
+            # Handle empty portfolio
+            if not positions:
+                return VaRResult(
+                    var_amount=Decimal("0"),
+                    cvar_amount=Decimal("0"),
+                    confidence=self.confidence,
+                    horizon_days=1,
+                    method="historical",
+                )
+
+            # 1. Align returns ------------------------------------------------
+            aligned = self._align_returns(positions, returns_matrix)
+
+            # 2. Portfolio weights ---------------------------------------------
+            instrument_ids = [iid for iid in positions if iid in aligned.columns]
+            total_value = sum(
+                float(positions[iid].market_value) for iid in instrument_ids
+            )
+            weights = np.array(
+                [float(positions[iid].market_value) / total_value for iid in instrument_ids]
+            )
+
+            # 3. Portfolio returns ---------------------------------------------
+            port_returns: np.ndarray = aligned[instrument_ids].values @ weights
+
+            # 4 & 5. VaR ------------------------------------------------------
+            alpha = (1.0 - self.confidence) * 100.0  # e.g. 1.0 for 99% confidence
+            var_pct = -float(np.percentile(port_returns, alpha))
+
+            # 6. CVaR ----------------------------------------------------------
+            threshold = -var_pct  # losses beyond this point
+            tail = port_returns[port_returns <= threshold]
+            if len(tail) > 0:
+                cvar_pct = -float(np.mean(tail))
+            else:
+                cvar_pct = var_pct
+
+            var_amount = Decimal(str(var_pct * total_value))
+            cvar_amount = Decimal(str(cvar_pct * total_value))
+
             return VaRResult(
-                var_amount=Decimal("0"),
-                cvar_amount=Decimal("0"),
+                var_amount=var_amount,
+                cvar_amount=cvar_amount,
                 confidence=self.confidence,
                 horizon_days=1,
                 method="historical",
+                distribution=[float(r) for r in port_returns],
             )
-
-        # 1. Align returns ------------------------------------------------
-        aligned = self._align_returns(positions, returns_matrix)
-
-        # 2. Portfolio weights ---------------------------------------------
-        instrument_ids = [iid for iid in positions if iid in aligned.columns]
-        total_value = sum(
-            float(positions[iid].market_value) for iid in instrument_ids
-        )
-        weights = np.array(
-            [float(positions[iid].market_value) / total_value for iid in instrument_ids]
-        )
-
-        # 3. Portfolio returns ---------------------------------------------
-        port_returns: np.ndarray = aligned[instrument_ids].values @ weights
-
-        # 4 & 5. VaR ------------------------------------------------------
-        alpha = (1.0 - self.confidence) * 100.0  # e.g. 1.0 for 99% confidence
-        var_pct = -float(np.percentile(port_returns, alpha))
-
-        # 6. CVaR ----------------------------------------------------------
-        threshold = -var_pct  # losses beyond this point
-        tail = port_returns[port_returns <= threshold]
-        if len(tail) > 0:
-            cvar_pct = -float(np.mean(tail))
-        else:
-            cvar_pct = var_pct
-
-        var_amount = Decimal(str(var_pct * total_value))
-        cvar_amount = Decimal(str(cvar_pct * total_value))
-
-        return VaRResult(
-            var_amount=var_amount,
-            cvar_amount=cvar_amount,
-            confidence=self.confidence,
-            horizon_days=1,
-            method="historical",
-            distribution=[float(r) for r in port_returns],
-        )
 
     # ------------------------------------------------------------------
     # Internal helpers
