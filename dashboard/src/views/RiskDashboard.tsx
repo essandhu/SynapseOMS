@@ -277,6 +277,7 @@ export function RiskDashboard() {
           confidence={varMetrics?.confidence ?? 95}
           lastComputed={varMetrics?.computedAt ?? null}
           method="Historical"
+          loading={loading}
         />
         <VaRGauge
           title="Parametric VaR"
@@ -285,6 +286,7 @@ export function RiskDashboard() {
           confidence={varMetrics?.confidence ?? 95}
           lastComputed={varMetrics?.computedAt ?? null}
           method="Parametric"
+          loading={loading}
         />
         <VaRGauge
           title="Monte Carlo VaR"
@@ -293,6 +295,7 @@ export function RiskDashboard() {
           confidence={varMetrics?.confidence ?? 95}
           lastComputed={varMetrics?.computedAt ?? null}
           method="Monte Carlo"
+          loading={loading}
         />
       </div>
 

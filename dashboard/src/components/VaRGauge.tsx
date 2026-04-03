@@ -5,6 +5,7 @@ interface VaRGaugeProps {
   confidence: number;
   lastComputed: string | null;
   method: string;
+  loading?: boolean;
 }
 
 function colorForPercentage(pct: number | null): string {
@@ -49,8 +50,9 @@ export function VaRGauge({
   confidence,
   lastComputed,
   method,
+  loading = false,
 }: VaRGaugeProps) {
-  const isLoading = amount === null;
+  const isLoading = loading && amount === null;
   const color = colorForPercentage(navPercentage);
   const twColor = twColorForPercentage(navPercentage);
 
@@ -103,7 +105,7 @@ export function VaRGauge({
 
           {/* Large value */}
           <span className={`-mt-2 font-mono text-2xl font-bold ${twColor}`}>
-            {formatCurrency(amount)}
+            {amount !== null ? formatCurrency(amount) : "$0"}
           </span>
 
           {/* NAV percentage */}
