@@ -10,8 +10,12 @@ import (
 	"github.com/synapse-oms/gateway/internal/store"
 )
 
-// ErrNotFound is returned when a credential does not exist for the requested venue.
-var ErrNotFound = errors.New("credential not found")
+// Sentinel errors for credential operations.
+var (
+	ErrNotFound          = errors.New("credential not found")
+	ErrPassphraseMismatch = errors.New("old passphrase does not match current passphrase")
+	ErrEmptyPassphrase    = errors.New("passphrase must not be empty")
+)
 
 // CredentialStore abstracts the persistence layer for encrypted credentials.
 // Implemented by store.PostgresStore and by in-memory fakes in tests.
@@ -20,6 +24,7 @@ type CredentialStore interface {
 	GetCredential(ctx context.Context, venueID string) (*store.CredentialRow, error)
 	DeleteCredential(ctx context.Context, venueID string) error
 	HasCredential(ctx context.Context, venueID string) (bool, error)
+	ListVenueIDs(ctx context.Context) ([]string, error)
 }
 
 // CredentialManager encrypts and decrypts venue credentials using AES-256-GCM
@@ -28,20 +33,27 @@ type CredentialStore interface {
 type CredentialManager struct {
 	passphrase string          // held in memory; used to derive per-credential keys
 	store      CredentialStore // persistence backend
+	kdfParams  KDFParams       // configurable Argon2id parameters
 }
 
 // NewCredentialManager creates a new manager bound to the given passphrase
-// and credential store.
-func NewCredentialManager(passphrase string, cs CredentialStore) (*CredentialManager, error) {
+// and credential store. Optional KDFParams may be provided; if omitted,
+// DefaultKDFParams() is used.
+func NewCredentialManager(passphrase string, cs CredentialStore, opts ...KDFParams) (*CredentialManager, error) {
 	if passphrase == "" {
-		return nil, errors.New("passphrase must not be empty")
+		return nil, ErrEmptyPassphrase
 	}
 	if cs == nil {
 		return nil, errors.New("credential store must not be nil")
 	}
+	params := DefaultKDFParams()
+	if len(opts) > 0 {
+		params = opts[0]
+	}
 	return &CredentialManager{
 		passphrase: passphrase,
 		store:      cs,
+		kdfParams:  params,
 	}, nil
 }
 
@@ -56,7 +68,8 @@ func (m *CredentialManager) Store(ctx context.Context, cred domain.VenueCredenti
 		return fmt.Errorf("generating salt: %w", err)
 	}
 
-	key := deriveKey(m.passphrase, salt)
+	key := deriveKeyWithParams(m.passphrase, salt, m.kdfParams)
+	defer ZeroBytes(key)
 
 	encKey, nonce, err := encrypt(key, []byte(cred.APIKey))
 	if err != nil {
@@ -117,7 +130,8 @@ func (m *CredentialManager) Retrieve(ctx context.Context, venueID string) (*doma
 		return nil, ErrNotFound
 	}
 
-	key := deriveKey(m.passphrase, row.Salt)
+	key := deriveKeyWithParams(m.passphrase, row.Salt, m.kdfParams)
+	defer ZeroBytes(key)
 
 	// Unpack nonces.
 	if len(row.Nonce) < nonceLen*2 {
@@ -180,4 +194,91 @@ func (m *CredentialManager) ValidateAll(ctx context.Context, venueIDs []string) 
 		results[id] = err
 	}
 	return results
+}
+
+// ListVenueIDs returns all venue IDs that have stored credentials.
+func (m *CredentialManager) ListVenueIDs(ctx context.Context) ([]string, error) {
+	return m.store.ListVenueIDs(ctx)
+}
+
+// RotatePassphrase re-encrypts all credentials with a new passphrase.
+// It decrypts each credential with the old passphrase, re-encrypts with
+// the new passphrase, and updates the store.
+func (m *CredentialManager) RotatePassphrase(ctx context.Context, oldPassphrase, newPassphrase string) error {
+	if oldPassphrase != m.passphrase {
+		return ErrPassphraseMismatch
+	}
+	if newPassphrase == "" {
+		return ErrEmptyPassphrase
+	}
+
+	venueIDs, err := m.store.ListVenueIDs(ctx)
+	if err != nil {
+		return fmt.Errorf("listing venue IDs: %w", err)
+	}
+
+	for _, venueID := range venueIDs {
+		if err := m.rotateCredential(ctx, venueID, newPassphrase); err != nil {
+			return fmt.Errorf("rotating credential for %s: %w", venueID, err)
+		}
+	}
+
+	m.passphrase = newPassphrase
+	return nil
+}
+
+// rotateCredential decrypts a single credential with the current passphrase
+// and re-encrypts it with the new passphrase.
+func (m *CredentialManager) rotateCredential(ctx context.Context, venueID, newPassphrase string) error {
+	cred, err := m.Retrieve(ctx, venueID)
+	if err != nil {
+		return fmt.Errorf("retrieving: %w", err)
+	}
+
+	salt, err := generateSalt()
+	if err != nil {
+		return fmt.Errorf("generating salt: %w", err)
+	}
+
+	newKey := deriveKeyWithParams(newPassphrase, salt, m.kdfParams)
+	defer ZeroBytes(newKey)
+
+	encKey, nonce, err := encrypt(newKey, []byte(cred.APIKey))
+	if err != nil {
+		return fmt.Errorf("encrypting API key: %w", err)
+	}
+
+	encSecret, nonceSecret, err := encrypt(newKey, []byte(cred.APISecret))
+	if err != nil {
+		return fmt.Errorf("encrypting API secret: %w", err)
+	}
+
+	var encPassphrase, noncePassphrase []byte
+	if cred.Passphrase != "" {
+		encPassphrase, noncePassphrase, err = encrypt(newKey, []byte(cred.Passphrase))
+		if err != nil {
+			return fmt.Errorf("encrypting passphrase: %w", err)
+		}
+	}
+
+	combinedNonce := make([]byte, 0, nonceLen*3)
+	combinedNonce = append(combinedNonce, nonce...)
+	combinedNonce = append(combinedNonce, nonceSecret...)
+	if noncePassphrase != nil {
+		combinedNonce = append(combinedNonce, noncePassphrase...)
+	}
+
+	now := time.Now().UTC()
+	row := &store.CredentialRow{
+		VenueID:             venueID,
+		EncryptedAPIKey:     encKey,
+		EncryptedAPISecret:  encSecret,
+		EncryptedPassphrase: encPassphrase,
+		Salt:                salt,
+		Nonce:               combinedNonce,
+		CreatedAt:           cred.CreatedAt,
+		UpdatedAt:           now,
+	}
+
+	return m.store.StoreCredential(ctx, row)
 }

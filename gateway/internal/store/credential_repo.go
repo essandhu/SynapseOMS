@@ -89,6 +89,28 @@ func (s *PostgresStore) HasCredential(ctx context.Context, venueID string) (bool
 	return exists, nil
 }
 
+// ListVenueIDs returns all venue IDs that have stored credentials.
+func (s *PostgresStore) ListVenueIDs(ctx context.Context) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `SELECT venue_id FROM venue_credentials ORDER BY venue_id`)
+	if err != nil {
+		return nil, fmt.Errorf("listing venue IDs: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning venue ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating venue IDs: %w", err)
+	}
+	return ids, nil
+}
+
 // scanCredential scans a single credential from a pgx.Row.
 func scanCredential(row pgx.Row) (*CredentialRow, error) {
 	var c CredentialRow
