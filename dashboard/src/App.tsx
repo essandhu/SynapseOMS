@@ -82,7 +82,6 @@ export function App() {
     const cleanup = initializeStreams({
       onOrderUpdate: () => {},
       onPositionUpdate: () => {},
-      onRiskUpdate: () => {},
       onVenueUpdate: () => {},
       onAnomalyAlert: applyAnomalyAlert,
     });

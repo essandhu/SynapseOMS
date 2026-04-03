@@ -4,9 +4,14 @@ package grpc
 import (
 	"context"
 	"log/slog"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/synapse-oms/gateway/internal/domain"
 	"github.com/synapse-oms/gateway/internal/logging"
+	pb "github.com/synapse-oms/gateway/internal/proto/riskpb"
 )
 
 // RiskCheckResult contains the outcome of a pre-trade risk check.
@@ -25,74 +30,81 @@ type RiskClient interface {
 }
 
 // grpcRiskClient connects to the Risk Engine over gRPC.
-// Until proto stubs are generated, it operates in fail-open mode.
 type grpcRiskClient struct {
 	address string
 	logger  *slog.Logger
-	// conn   *grpc.ClientConn        // Uncomment when grpc dependency is added
-	// client pb.RiskGateClient       // Uncomment when proto stubs are generated
+	conn    *grpc.ClientConn
+	client  pb.RiskGateClient
 }
 
-// NewRiskClient creates a RiskClient that connects to the Risk Engine at the
-// given address. Since proto stubs and the grpc dependency are not yet wired,
-// this currently returns a fail-open client that approves all orders.
+// NewRiskClient creates a RiskClient that connects to the Risk Engine gRPC
+// server at the given address (e.g. "risk-engine:50051").
 func NewRiskClient(address string) (RiskClient, error) {
 	logger := logging.NewDefault("gateway", "risk-client")
-	logger.Info("creating risk client (fail-open until proto stubs generated)",
+	logger.Info("connecting to risk engine gRPC server",
 		slog.String("address", address),
 	)
 
-	// TODO: once google.golang.org/grpc is added to go.mod and proto stubs
-	// are generated, establish a real connection:
-	//
-	//   conn, err := grpc.NewClient(address,
-	//       grpc.WithTransportCredentials(insecure.NewCredentials()),
-	//   )
-	//   if err != nil {
-	//       return nil, err
-	//   }
-	//   return &grpcRiskClient{address: address, conn: conn, logger: logger}, nil
+	conn, err := grpc.NewClient(
+		address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.ForceCodec(pb.NewCodec())),
+	)
+	if err != nil {
+		return nil, err
+	}
 
-	return &grpcRiskClient{address: address, logger: logger}, nil
+	return &grpcRiskClient{
+		address: address,
+		logger:  logger,
+		conn:    conn,
+		client:  pb.NewRiskGateClient(conn),
+	}, nil
 }
 
 // CheckPreTradeRisk calls the Risk Engine's CheckPreTradeRisk RPC.
-// Currently operates in fail-open mode: all orders are approved.
-func (c *grpcRiskClient) CheckPreTradeRisk(_ context.Context, order *domain.Order) (*RiskCheckResult, error) {
-	// TODO: implement real gRPC call once proto stubs are generated:
-	//
-	//   resp, err := c.client.CheckPreTradeRisk(ctx, &pb.CheckPreTradeRiskRequest{
-	//       OrderId:      string(order.ID),
-	//       InstrumentId: order.InstrumentID,
-	//       Side:         order.Side.String(),
-	//       Quantity:     order.Quantity.String(),
-	//       Price:        order.Price.String(),
-	//   })
-	//   if err != nil {
-	//       // fail-open: log error, return approved
-	//       c.logger.Warn("risk engine unavailable, failing open",
-	//           slog.String("order_id", string(order.ID)),
-	//           slog.String("error", err.Error()),
-	//       )
-	//       return &RiskCheckResult{Approved: true}, nil
-	//   }
+// On transport errors, it returns the error (the pipeline decides fail-open/closed).
+func (c *grpcRiskClient) CheckPreTradeRisk(ctx context.Context, order *domain.Order) (*RiskCheckResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
 
-	c.logger.Debug("risk check (fail-open): approved",
+	req := &pb.PreTradeRiskRequest{
+		OrderId:      string(order.ID),
+		InstrumentId: order.InstrumentID,
+		Side:         sideString(order.Side),
+		Quantity:     order.Quantity.String(),
+		Price:        order.Price.String(),
+		AssetClass:   assetClassString(order.AssetClass),
+		VenueId:      order.VenueID,
+	}
+
+	resp, err := c.client.CheckPreTradeRisk(ctx, req)
+	if err != nil {
+		c.logger.Warn("risk engine gRPC call failed",
+			slog.String("order_id", string(order.ID)),
+			slog.String("error", err.Error()),
+		)
+		return nil, err
+	}
+
+	c.logger.Debug("risk check completed",
 		slog.String("order_id", string(order.ID)),
-		slog.String("instrument", order.InstrumentID),
+		slog.Bool("approved", resp.Approved),
 	)
 
 	return &RiskCheckResult{
-		Approved: true,
+		Approved:     resp.Approved,
+		RejectReason: resp.RejectReason,
+		VaRBefore:    resp.PortfolioVarBefore,
+		VaRAfter:     resp.PortfolioVarAfter,
 	}, nil
 }
 
 // Close shuts down the gRPC connection.
 func (c *grpcRiskClient) Close() error {
-	// TODO: close the real gRPC connection once wired
-	// if c.conn != nil {
-	//     return c.conn.Close()
-	// }
+	if c.conn != nil {
+		return c.conn.Close()
+	}
 	return nil
 }
 
@@ -117,4 +129,26 @@ func (c *FailOpenRiskClient) CheckPreTradeRisk(_ context.Context, _ *domain.Orde
 // Close is a no-op for the fail-open client.
 func (c *FailOpenRiskClient) Close() error {
 	return nil
+}
+
+func sideString(s domain.OrderSide) string {
+	switch s {
+	case domain.SideBuy:
+		return "BUY"
+	case domain.SideSell:
+		return "SELL"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+func assetClassString(ac domain.AssetClass) string {
+	switch ac {
+	case domain.AssetClassEquity:
+		return "equity"
+	case domain.AssetClassCrypto:
+		return "crypto"
+	default:
+		return "other"
+	}
 }

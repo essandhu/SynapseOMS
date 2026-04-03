@@ -17,11 +17,6 @@ vi.mock("../api/rest", () => ({
   fetchConcentration: vi.fn(),
 }));
 
-// Mock the WebSocket module
-vi.mock("../api/ws", () => ({
-  createRiskStream: vi.fn(() => ({ close: vi.fn() })),
-}));
-
 // Import mocked modules so we can control their return values
 import {
   fetchVaR,

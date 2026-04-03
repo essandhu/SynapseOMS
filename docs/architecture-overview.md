@@ -89,9 +89,9 @@ User enters credentials (Dashboard)
 
 | Layer | Technology |
 |-------|-----------|
-| Gateway | Go 1.22, Chi router, slog, shopspring/decimal |
-| Risk Engine | Python 3.12, FastAPI, NumPy, SciPy, cvxpy, scikit-learn |
-| Dashboard | TypeScript, React 18, Vite, Zustand, AG Grid, Recharts, Tailwind CSS |
+| Gateway | Go 1.25, Chi router, slog, shopspring/decimal |
+| Risk Engine | Python 3.12+, FastAPI, NumPy, SciPy, cvxpy, scikit-learn |
+| Dashboard | TypeScript, React 19, Vite 6, Zustand 5, AG Grid, Recharts, Tailwind CSS 4 |
 | Messaging | Apache Kafka 3.7 (KRaft mode) |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |

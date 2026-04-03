@@ -2,13 +2,11 @@ import ReconnectingWebSocket from "reconnecting-websocket";
 import type {
   OrderUpdate,
   PositionUpdate,
-  RiskUpdate,
   VenueStatusUpdate,
   AnomalyAlert,
 } from "./types";
 
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
-const RISK_WS = import.meta.env.VITE_RISK_WS_URL || "ws://localhost:8081";
 
 /** Connection state for UI indicators. */
 export type ConnectionState = "connected" | "disconnected" | "reconnecting";
@@ -85,27 +83,6 @@ export function createPositionStream(
 }
 
 /**
- * Creates a WebSocket connection for real-time risk updates.
- * Automatically reconnects on disconnect.
- */
-export function createRiskStream(
-  onUpdate: (update: RiskUpdate) => void,
-): ReconnectingWebSocket {
-  const ws = new ReconnectingWebSocket(`${RISK_WS}/ws/risk`);
-
-  ws.addEventListener("message", (event: MessageEvent) => {
-    try {
-      const data = JSON.parse(event.data as string) as RiskUpdate;
-      onUpdate(data);
-    } catch {
-      console.error("[ws:risk] Failed to parse message");
-    }
-  });
-
-  return ws;
-}
-
-/**
  * Creates a WebSocket connection for real-time venue status updates.
  * Automatically reconnects on disconnect.
  */
@@ -160,22 +137,19 @@ export function createAnomalyStream(
 export function initializeStreams(handlers: {
   onOrderUpdate: (update: OrderUpdate) => void;
   onPositionUpdate: (update: PositionUpdate) => void;
-  onRiskUpdate: (update: RiskUpdate) => void;
   onVenueUpdate: (update: VenueStatusUpdate) => void;
   onAnomalyAlert?: (alert: AnomalyAlert) => void;
   onConnectionStateChange?: ConnectionStateCallback;
 }): () => void {
   const orderWs = createOrderStream(handlers.onOrderUpdate);
   const positionWs = createPositionStream(handlers.onPositionUpdate);
-  const riskWs = createRiskStream(handlers.onRiskUpdate);
   const venueWs = createVenueStream(handlers.onVenueUpdate);
 
   attachConnectionStateListeners(orderWs, "orders", handlers.onConnectionStateChange);
   attachConnectionStateListeners(positionWs, "positions", handlers.onConnectionStateChange);
-  attachConnectionStateListeners(riskWs, "risk", handlers.onConnectionStateChange);
   attachConnectionStateListeners(venueWs, "venues", handlers.onConnectionStateChange);
 
-  const streams: ReconnectingWebSocket[] = [orderWs, positionWs, riskWs, venueWs];
+  const streams: ReconnectingWebSocket[] = [orderWs, positionWs, venueWs];
 
   if (handlers.onAnomalyAlert) {
     const anomalyWs = createAnomalyStream(handlers.onAnomalyAlert);

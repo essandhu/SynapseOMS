@@ -194,7 +194,7 @@ Run the contract tests:
 
 ```bash
 cd gateway
-go test ./internal/adapter/ -run TestContractSuite -v
+go test ./internal/adapter/ -run TestMyExchangeAdapterContract -v
 # Or run all adapter tests:
 go test ./internal/adapter/... -v
 ```

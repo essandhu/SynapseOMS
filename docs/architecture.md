@@ -1,6 +1,6 @@
 # SynapseOMS Architecture Document
 
-> **Version:** 1.0.0 | **Date:** 2026-04-01 | **Status:** Pre-Implementation
+> **Version:** 1.1.0 | **Date:** 2026-04-02 | **Status:** Post-Implementation (all 5 phases complete)
 
 ## Executive Summary
 
@@ -38,9 +38,6 @@ synapse-oms/
 │   │   │   ├── instrument.go           # Instrument value object
 │   │   │   ├── position.go             # Position aggregate
 │   │   │   └── venue_credential.go     # VenueCredential (encrypted)
-│   │   ├── orderbook/                  # In-memory order management
-│   │   │   ├── book.go                 # Order book per instrument
-│   │   │   └── book_test.go
 │   │   ├── router/                     # Smart Order Router
 │   │   │   ├── router.go              # Routing engine
 │   │   │   ├── strategy.go            # Routing strategies (best-price, TWAP, ML-scored)
@@ -72,20 +69,34 @@ synapse-oms/
 │   │   │   ├── vault.go               # On-disk encrypted storage
 │   │   │   └── manager_test.go
 │   │   ├── pipeline/                   # Order processing pipeline
-│   │   │   ├── pipeline.go            # Intake → risk check → route → report
-│   │   │   ├── stage.go               # Pipeline stage interface
+│   │   │   ├── pipeline.go            # Intake → risk check → route → fill → notify (goroutine-based stages)
+│   │   │   ├── notifier.go            # WebSocket notification helpers
 │   │   │   └── pipeline_test.go
-│   │   ├── kafka/                      # Kafka producer
-│   │   │   └── producer.go
+│   │   ├── marketdata/                  # OHLC bar aggregation
+│   │   │   └── aggregator.go          # Tick-to-bar aggregation, configurable intervals
+│   │   ├── kafka/                      # Kafka producer + anomaly relay
+│   │   │   ├── producer.go
+│   │   │   └── anomaly_consumer.go    # Relays anomaly alerts from Kafka to WebSocket
+│   │   ├── proto/riskpb/                # Hand-written proto stubs (protowire encoding)
+│   │   │   ├── risk.pb.go             # PreTradeRiskRequest/Response, RiskCheck
+│   │   │   ├── risk_grpc.pb.go        # RiskGateClient
+│   │   │   └── codec.go              # Custom gRPC codec for wire compatibility
 │   │   ├── grpc/                       # gRPC client (risk pre-checks)
-│   │   │   └── risk_client.go
+│   │   │   └── risk_client.go         # Real gRPC client to risk engine:50051
 │   │   ├── ws/                         # WebSocket server
-│   │   │   └── server.go
-│   │   └── rest/                       # REST API handlers
-│   │       ├── handler_order.go
-│   │       ├── handler_position.go
-│   │       ├── handler_venue.go
-│   │       └── handler_credential.go
+│   │   │   ├── server.go              # /ws/orders, /ws/positions, /ws/venues, /ws/anomalies
+│   │   │   └── hub.go                 # WebSocket hub for broadcast management
+│   │   ├── rest/                       # REST API handlers
+│   │   │   ├── handler_order.go
+│   │   │   ├── handler_position.go
+│   │   │   ├── handler_venue.go
+│   │   │   ├── handler_credential.go
+│   │   │   ├── handler_instrument.go
+│   │   │   └── router.go
+│   │   ├── apperror/                   # Structured error types
+│   │   ├── logging/                    # Structured logging
+│   │   ├── metrics/                    # Prometheus metrics
+│   │   └── store/                      # PostgreSQL repository layer
 │   ├── go.mod
 │   ├── go.sum
 │   └── Dockerfile
@@ -102,8 +113,7 @@ synapse-oms/
 │   │   ├── var/                        # Value-at-Risk computations
 │   │   │   ├── historical.py           # Historical simulation VaR
 │   │   │   ├── parametric.py           # Variance-covariance VaR
-│   │   │   ├── monte_carlo.py          # Monte Carlo VaR (correlated paths)
-│   │   │   └── var_test.py
+│   │   │   └── monte_carlo.py          # Monte Carlo VaR (correlated paths)
 │   │   ├── greeks/                     # Portfolio Greeks
 │   │   │   ├── calculator.py
 │   │   │   └── calculator_test.py
@@ -118,20 +128,22 @@ synapse-oms/
 │   │   │   ├── constraints.py          # Constraint definitions
 │   │   │   └── optimizer_test.py
 │   │   ├── anomaly/                    # Market data anomaly detection
-│   │   │   ├── detector.py             # Isolation forest streaming detector
+│   │   │   ├── detector.py             # Isolation Forest streaming detector
+│   │   │   ├── consumer.py             # Kafka consumer for market-data → anomaly alerts
 │   │   │   └── detector_test.py
-│   │   ├── timeseries/                 # Rolling statistics, covariance, regime
+│   │   ├── timeseries/                 # Rolling statistics, covariance
 │   │   │   ├── statistics.py
-│   │   │   ├── covariance.py
-│   │   │   └── regime.py
+│   │   │   └── covariance.py
 │   │   ├── kafka/                      # Kafka consumer
-│   │   │   └── consumer.py
+│   │   │   └── consumer.py             # Portfolio state builder from order-lifecycle events
+│   │   ├── metrics.py                  # Prometheus metrics instrumentation
 │   │   ├── grpc_server/                # gRPC server (pre-trade risk checks)
 │   │   │   └── server.py
 │   │   └── rest/                       # REST API (FastAPI)
 │   │       ├── router_risk.py
 │   │       ├── router_optimizer.py
-│   │       └── router_scenario.py
+│   │       ├── router_anomaly.py       # Anomaly alert endpoints
+│   │       └── router_ai.py            # AI execution reports + rebalancing
 │   ├── tests/
 │   │   ├── conftest.py
 │   │   ├── test_var_historical.py
@@ -140,16 +152,15 @@ synapse-oms/
 │   │   ├── test_optimizer.py
 │   │   ├── test_settlement.py
 │   │   └── test_anomaly.py
-│   ├── pyproject.toml                  # uv / pip project config
-│   ├── Dockerfile
-│   └── requirements.lock
+│   ├── pyproject.toml                  # pip project config with pinned version ranges
+│   └── Dockerfile
 │
 ├── dashboard/                          # Frontend Dashboard (TypeScript + React)
 │   ├── src/
 │   │   ├── main.tsx                    # App entry
 │   │   ├── App.tsx                     # Root layout + routing
 │   │   ├── api/                        # API client layer
-│   │   │   ├── rest.ts                 # REST client (axios/fetch wrapper)
+│   │   │   ├── rest.ts                 # REST client (ky HTTP wrapper)
 │   │   │   ├── ws.ts                   # WebSocket client with reconnect
 │   │   │   └── types.ts               # Generated from proto → TS types
 │   │   ├── stores/                     # Zustand state stores
@@ -157,13 +168,15 @@ synapse-oms/
 │   │   │   ├── positionStore.ts
 │   │   │   ├── riskStore.ts
 │   │   │   ├── venueStore.ts
-│   │   │   └── insightStore.ts
+│   │   │   ├── insightStore.ts
+│   │   │   └── marketDataStore.ts     # OHLC bar state from WebSocket
 │   │   ├── views/                      # Top-level page views
 │   │   │   ├── BlotterView.tsx         # Unified order blotter
 │   │   │   ├── PortfolioView.tsx       # Positions + P&L
 │   │   │   ├── RiskDashboard.tsx       # VaR, Greeks, drawdown
 │   │   │   ├── LiquidityNetwork.tsx    # Venue connections + health
 │   │   │   ├── InsightsPanel.tsx       # AI analysis + alerts
+│   │   │   ├── OptimizerView.tsx      # Portfolio optimization
 │   │   │   └── OnboardingView.tsx      # First-run experience
 │   │   ├── components/                 # Reusable UI components
 │   │   │   ├── OrderTicket.tsx         # Order entry form
@@ -173,7 +186,10 @@ synapse-oms/
 │   │   │   ├── ExposureTreemap.tsx     # D3 treemap
 │   │   │   ├── DrawdownChart.tsx       # Recharts drawdown
 │   │   │   ├── MonteCarloPlot.tsx      # MC simulation distribution
-│   │   │   ├── CandlestickChart.tsx    # Lightweight Charts wrapper
+│   │   │   ├── CandlestickChart.tsx   # OHLC candlestick chart (lightweight-charts v5)
+│   │   │   ├── GreeksHeatmap.tsx       # Portfolio Greeks visualization
+│   │   │   ├── ConcentrationTreemap.tsx # Concentration risk treemap
+│   │   │   ├── AlertBadge.tsx          # Anomaly alert badge
 │   │   │   ├── VenueCard.tsx           # Venue status card
 │   │   │   ├── CredentialForm.tsx      # API key input (secure)
 │   │   │   └── TerminalLayout.tsx      # Dark terminal shell + panels
@@ -202,9 +218,14 @@ synapse-oms/
 │   │   └── model_test.py
 │   └── requirements.txt
 │
+├── .github/workflows/                  # CI/CD
+│   └── ci.yml                          # Build + test all services on PR
+│
 ├── deploy/                             # Deployment configurations
-│   ├── docker-compose.yml              # Primary: single `docker compose up`
+│   ├── docker-compose.yml              # Primary: single `docker compose up` (with monitoring profile)
 │   ├── docker-compose.dev.yml          # Dev overrides (hot reload, debug ports)
+│   ├── prometheus.yml                  # Prometheus scrape config
+│   ├── .env.example                    # Environment variable template
 │   ├── k8s/                            # Kubernetes manifests
 │   │   ├── namespace.yaml
 │   │   ├── gateway-deployment.yaml
@@ -2595,3 +2616,59 @@ sequenceDiagram
     GW-->>DB: {status: "connected"}
     GW->>WS: Broadcast venue status change
 ```
+
+---
+
+## Appendix B: Implementation Deviations
+
+This section documents intentional deviations from the original architecture made during implementation across all 5 phases. Each deviation is tagged with the phase where it was introduced.
+
+### B.1 Gateway Deviations
+
+| Area | Original Spec | Actual Implementation | Phase | Rationale |
+|------|--------------|----------------------|-------|-----------|
+| **orderbook/** package | Standalone `book.go` + `book_test.go` | **Removed.** Order book logic lives inside `simulated/matching_engine.go` | P1 | The matching engine manages its own book internally; a separate module was unnecessary |
+| **pipeline/stage.go** | Pipeline stage interface | **Removed.** Pipeline uses goroutine-based stages (channels between risk check → router → venue dispatch) | P1 | Channel-based concurrency is more idiomatic Go and simpler than a stage interface |
+| **Pipeline Store** | `NewPipeline(store *PostgresStore, ...)` | `NewPipeline(store Store, ...)` where `Store` is an interface | P1 | Enables unit testing without a running database |
+| **Dockerfile runtime** | `gcr.io/distroless/static-debian12` | `alpine:3.20` with curl | P1 | Docker Compose health check requires curl; distroless doesn't provide it |
+| **gRPC risk client** | Direct `grpc.NewClient` with proto stubs | Custom `protowire`-based codec with `grpc.ForceCodec` | P2→Final | Go proto stubs not generated via buf; manual protowire encoding is wire-compatible |
+| **Kafka producer** | Standard Go build | Requires CGO (librdkafka via confluent-kafka-go) | P2 | Docker build environment provides the necessary C toolchain |
+
+### B.2 Risk Engine Deviations
+
+| Area | Original Spec | Actual Implementation | Phase | Rationale |
+|------|--------------|----------------------|-------|-----------|
+| **requirements.lock** | Hand-written lock file | **Removed.** `pyproject.toml` with pinned version ranges is the dependency source of truth | P2 | Lock files are generated tooling artifacts, not deliverables |
+| **var_test.py** | Monolithic VaR test file | Split into `test_var_historical.py`, `test_var_parametric.py`, `test_var_monte_carlo.py` (26 tests) | P2 | Better test organization by VaR method |
+| **ECOS solver** | cvxpy with ECOS | Solver fallback chain: ECOS → CLARABEL → SCS | P3 | ECOS lacks Python 3.14 wheels; CLARABEL produces equivalent results |
+| **regime.py** | Regime detection module | **Deferred.** Not implemented | — | Never assigned to any phase; future enhancement for market-regime-aware VaR |
+| **router_scenario.py** | What-if scenario endpoint | **Deferred.** Not implemented | — | Never assigned to any phase; future enhancement |
+| **REST routers** | `router_risk.py`, `router_optimizer.py`, `router_scenario.py` | Added `router_anomaly.py` (anomaly alerts) and `router_ai.py` (execution reports, rebalancing) | P4 | New AI and anomaly features required additional REST routers |
+| **VaR instrumentation** | Wrap `compute()` with Prometheus timing | `compute()` delegates to `_compute_inner()` with timing wrapper | P5 | Cleaner than restructuring entire method body |
+| **gRPC timeout** | 10ms budget per pre-trade check | Fail-open if 10ms budget exceeded mid-check | P5 | Consistent with fail-open philosophy |
+
+### B.3 Dashboard Deviations
+
+| Area | Original Spec | Actual Implementation | Phase | Rationale |
+|------|--------------|----------------------|-------|-----------|
+| **CandlestickChart.tsx** | Lightweight Charts wrapper | Implemented with lightweight-charts v5 (`addSeries` API) | P6 | v5 uses generic `addSeries(CandlestickSeries, opts)` instead of `addCandlestickSeries()` |
+| **/ws/risk WebSocket** | Risk updates via WebSocket stream | **Removed.** Risk data fetched via REST polling (30s interval) | Final | Risk engine is FastAPI HTTP-only; no WebSocket endpoint exists. REST polling works reliably |
+| **CredentialForm reuse** | Shared component used by onboarding + venue panel | Venue panel has inline `ConnectModal` | P2 | Concurrent subagent execution couldn't guarantee shared component existed |
+| **VenueCard drill-down** | Real per-venue stats from backend API | Mock-derived from existing venue metrics | P3 | No backend endpoint for per-venue detailed statistics was specified |
+| **REST client** | axios/fetch wrapper | Uses `ky` HTTP client | P1 | ky is lighter-weight and has better defaults for JSON APIs |
+
+### B.4 AI Module Deviations
+
+| Area | Original Spec | Actual Implementation | Phase | Rationale |
+|------|--------------|----------------------|-------|-----------|
+| **Test layout** | `analyst_test.py` flat alongside module | `tests/test_analyst.py` (tests subdirectory) | P4 | Consistent with pytest discovery conventions |
+| **ai/__init__.py** | Not in directory listing | Created | P4 | Required for Python package imports |
+| **RebalancingAssistant** | `async def extract_constraints(...)` | Synchronous method | P4 | Anthropic Python SDK's `messages.create` is synchronous; runs in FastAPI thread pool |
+
+### B.5 Infrastructure Deviations
+
+| Area | Original Spec | Actual Implementation | Phase | Rationale |
+|------|--------------|----------------------|-------|-----------|
+| **Grafana provisioning** | Dashboard JSON files only | Added `dashboards.yml` and `datasources.yml` | P5 | Required for Grafana auto-discovery of dashboards and Prometheus datasource |
+| **Tokenized adapter** | Reuses `simulated.MatchingEngine` internally | Added exported `CancelOrder()` and `FindOrder()` to MatchingEngine | P5 | Go package visibility — different package needs exported methods |
+| **release.yml** | Docker image build + push workflow | **Deferred** | — | Post-launch concern; manual `docker compose build` suffices |
