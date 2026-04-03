@@ -73,10 +73,11 @@ services:
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: synapse-oms-local-001
     healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   ml-scorer:
     build:
@@ -85,15 +86,15 @@ services:
     ports: ["8090:8090"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8090/health')\""]
       interval: 10s
       timeout: 5s
       retries: 3
 
   risk-engine:
     build:
-      context: ../risk-engine
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: risk-engine/Dockerfile
     ports:
       - "8081:8081"
       - "50051:50051"
@@ -109,7 +110,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/v1/health"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8081/api/v1/health')\""]
       interval: 10s
       timeout: 5s
       retries: 3

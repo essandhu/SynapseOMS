@@ -7,11 +7,12 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /gateway ./cmd/gateway
+RUN go build -o /gateway ./cmd/gateway
 
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /gateway /gateway
 

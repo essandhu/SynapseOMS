@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS venue_credentials (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_venue_credentials_venue_id ON venue_credentials(venue_id);
+CREATE INDEX IF NOT EXISTS idx_venue_credentials_venue_id ON venue_credentials(venue_id);
 
 COMMIT;
