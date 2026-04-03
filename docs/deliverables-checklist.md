@@ -201,3 +201,7 @@
 - [x] E2E: multi-venue portfolio (Playwright) — e2e/multi-venue-portfolio.spec.ts: equity + crypto orders → unified portfolio
 - [x] E2E: order cancellation (Playwright) — e2e/order-cancellation.spec.ts: limit order → acknowledged → cancel → canceled
 - [x] ~~gateway/internal/pipeline/pipeline_bench_test.go~~ — SUPERSEDED: performance benchmarking covered by k6 load test scripts (loadtest/k6/order_flow.js)
+- [x] dashboard/src/stores/orderStore.test.ts (order store unit tests — 14 tests)
+- [x] dashboard/src/stores/positionStore.test.ts (position store unit tests — 9 tests)
+- [x] risk_engine/tests/test_rest_ai.py (AI REST endpoint tests — 5 tests, import error fixed in Phase 8)
+- [x] ai/smart_router_ml/tests/test_train.py (XGBoost training tests — moved from root to tests/ directory in Phase 8)
