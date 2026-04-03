@@ -261,16 +261,6 @@ func TestNewCredentialManagerValidation(t *testing.T) {
 
 // ---------- P5-08: Key rotation, secure memory, configurable KDF ----------
 
-func (s *memStore) ListVenueIDs(_ context.Context) ([]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	ids := make([]string, 0, len(s.rows))
-	for id := range s.rows {
-		ids = append(ids, id)
-	}
-	return ids, nil
-}
-
 func TestRotatePassphrase(t *testing.T) {
 	ms := newMemStore()
 	mgr, err := NewCredentialManager("old-pass", ms)

@@ -52,10 +52,6 @@ func NewCredentialManagerWithParams(passphrase string, cs CredentialStore, param
 	if cs == nil {
 		return nil, errors.New("credential store must not be nil")
 	}
-	params := DefaultKDFParams()
-	if len(opts) > 0 {
-		params = opts[0]
-	}
 	return &CredentialManager{
 		passphrase: passphrase,
 		store:      cs,
