@@ -36,6 +36,7 @@ export function BlotterView() {
   const [ticketOpen, setTicketOpen] = useState(true);
   const [chartOpen, setChartOpen] = useState(false);
   const [chartInstrument, setChartInstrument] = useState("AAPL");
+  const [chartInterval, setChartInterval] = useState<"1m" | "5m">("1m");
   const subscribeMarketData = useMarketDataStore((s) => s.subscribe);
 
   // Subscribe to WebSocket and load initial orders
@@ -163,9 +164,24 @@ export function BlotterView() {
                   <option value="AAPL">AAPL</option>
                 )}
               </select>
+              {(["1m", "5m"] as const).map((iv) => (
+                <button
+                  key={iv}
+                  onClick={() => setChartInterval(iv)}
+                  data-testid={`interval-${iv}`}
+                  className="rounded px-2 py-0.5 font-mono text-xs font-medium transition-colors"
+                  style={{
+                    backgroundColor: chartInterval === iv ? "rgba(59,130,246,0.2)" : "transparent",
+                    color: chartInterval === iv ? "#3b82f6" : "#6b7280",
+                    border: `1px solid ${chartInterval === iv ? "rgba(59,130,246,0.3)" : "transparent"}`,
+                  }}
+                >
+                  {iv}
+                </button>
+              ))}
             </div>
             <div style={{ height: 248 }}>
-              <CandlestickChart instrumentId={chartInstrument} />
+              <CandlestickChart instrumentId={chartInstrument} interval={chartInterval} />
             </div>
           </div>
         )}

@@ -25,17 +25,26 @@ type CredentialRetriever interface {
 	Retrieve(ctx context.Context, venueID string) (*domain.VenueCredential, error)
 }
 
+// MarketDataIngester processes market data ticks (implemented by Aggregator).
+type MarketDataIngester interface {
+	Ingest(snap adapter.MarketDataSnapshot)
+}
+
 // VenueHandler implements REST endpoints for venue management.
 type VenueHandler struct {
-	credMgr CredentialRetriever
-	logger  *slog.Logger
+	credMgr    CredentialRetriever
+	logger     *slog.Logger
+	aggregators []MarketDataIngester
+	mdCancels  map[string]context.CancelFunc // venueID -> cancel func for market data goroutine
 }
 
 // NewVenueHandler creates a VenueHandler with the given dependencies.
-func NewVenueHandler(credMgr CredentialRetriever, logger *slog.Logger) *VenueHandler {
+func NewVenueHandler(credMgr CredentialRetriever, logger *slog.Logger, aggregators ...MarketDataIngester) *VenueHandler {
 	return &VenueHandler{
-		credMgr: credMgr,
-		logger:  logger,
+		credMgr:    credMgr,
+		logger:     logger,
+		aggregators: aggregators,
+		mdCancels:  make(map[string]context.CancelFunc),
 	}
 }
 
@@ -147,6 +156,11 @@ func (h *VenueHandler) connectVenue(w http.ResponseWriter, r *http.Request) {
 		slog.String("venue_id", venueID),
 	)
 
+	// Subscribe to market data and feed to aggregators
+	if len(h.aggregators) > 0 {
+		h.subscribeMarketData(venueID, p)
+	}
+
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"id":     venueID,
@@ -166,6 +180,12 @@ func (h *VenueHandler) disconnectVenue(w http.ResponseWriter, r *http.Request) {
 			HTTPStatus: http.StatusNotFound,
 		})
 		return
+	}
+
+	// Cancel market data subscription before disconnecting
+	if cancel, ok := h.mdCancels[venueID]; ok {
+		cancel()
+		delete(h.mdCancels, venueID)
 	}
 
 	if err := p.Disconnect(r.Context()); err != nil {
@@ -190,6 +210,45 @@ func (h *VenueHandler) disconnectVenue(w http.ResponseWriter, r *http.Request) {
 		"id":     venueID,
 		"status": "disconnected",
 	})
+}
+
+// subscribeMarketData starts a goroutine that feeds market data from a venue
+// to all registered aggregators. The goroutine is cancelable via mdCancels.
+func (h *VenueHandler) subscribeMarketData(venueID string, p adapter.LiquidityProvider) {
+	ctx, cancel := context.WithCancel(context.Background())
+	h.mdCancels[venueID] = cancel
+
+	mdChan, err := p.SubscribeMarketData(ctx, nil)
+	if err != nil {
+		h.logger.Warn("failed to subscribe to market data on connect",
+			slog.String("venue_id", venueID),
+			slog.String("error", err.Error()),
+		)
+		cancel()
+		delete(h.mdCancels, venueID)
+		return
+	}
+
+	go func() {
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case snap, ok := <-mdChan:
+				if !ok {
+					return
+				}
+				for _, agg := range h.aggregators {
+					agg.Ingest(snap)
+				}
+			}
+		}
+	}()
+
+	h.logger.Info("market data subscribed on venue connect",
+		slog.String("venue_id", venueID),
+	)
 }
 
 // assetClassToString converts a domain.AssetClass to its JSON-friendly string.

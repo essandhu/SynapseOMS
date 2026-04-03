@@ -33,6 +33,10 @@ __pycache__/
 .venv/
 *.egg-info/
 
+# Playwright
+test-results/
+playwright-report/
+
 # Environment
 .env
 .env.local

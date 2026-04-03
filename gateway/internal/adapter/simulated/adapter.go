@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -240,6 +241,7 @@ func (a *Adapter) SubscribeMarketData(_ context.Context, _ []string) (<-chan ada
 						LastPrice:    price,
 						BidPrice:     price.Sub(halfSpread),
 						AskPrice:     price.Add(halfSpread),
+						TickVolume:   decimal.NewFromFloat(rand.Float64()*999 + 1),
 						Timestamp:    time.Now(),
 					}
 					select {

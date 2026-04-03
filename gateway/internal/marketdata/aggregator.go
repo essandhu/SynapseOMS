@@ -2,12 +2,25 @@
 package marketdata
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/synapse-oms/gateway/internal/adapter"
 )
+
+// intervalLabel returns a human-readable label for a bar interval duration.
+func intervalLabel(d time.Duration) string {
+	switch d {
+	case time.Minute:
+		return "1m"
+	case 5 * time.Minute:
+		return "5m"
+	default:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+}
 
 // OHLCBar represents a single OHLC candlestick bar.
 type OHLCBar struct {
@@ -22,12 +35,14 @@ type OHLCBar struct {
 	PeriodEnd    time.Time
 	TickCount    int
 	Complete     bool
+	Interval     string
 }
 
 // Aggregator collects MarketDataSnapshot ticks and produces OHLC bars.
 // Completed bars are sent to the output channel. Thread-safe.
 type Aggregator struct {
 	interval time.Duration
+	label    string
 	out      chan<- OHLCBar
 
 	mu   sync.RWMutex
@@ -39,6 +54,7 @@ type Aggregator struct {
 func NewAggregator(interval time.Duration, out chan<- OHLCBar) *Aggregator {
 	return &Aggregator{
 		interval: interval,
+		label:    intervalLabel(interval),
 		out:      out,
 		bars:     make(map[string]*OHLCBar),
 	}
@@ -77,6 +93,7 @@ func (a *Aggregator) Ingest(snap adapter.MarketDataSnapshot) {
 		bar.Low = snap.LastPrice
 	}
 	bar.Close = snap.LastPrice
+	bar.Volume = bar.Volume.Add(snap.TickVolume)
 	bar.TickCount++
 }
 
@@ -116,9 +133,10 @@ func (a *Aggregator) newBar(snap adapter.MarketDataSnapshot, periodStart time.Ti
 		High:         snap.LastPrice,
 		Low:          snap.LastPrice,
 		Close:        snap.LastPrice,
-		Volume:       decimal.Zero,
+		Volume:       snap.TickVolume,
 		PeriodStart:  periodStart,
 		TickCount:    1,
+		Interval:     a.label,
 	}
 }
 
