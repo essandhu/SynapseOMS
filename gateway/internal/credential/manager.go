@@ -10,11 +10,13 @@ import (
 	"github.com/synapse-oms/gateway/internal/store"
 )
 
-// Sentinel errors for credential operations.
 var (
-	ErrNotFound          = errors.New("credential not found")
+	// ErrNotFound is returned when a credential does not exist for the requested venue.
+	ErrNotFound = errors.New("credential not found")
+	// ErrPassphraseMismatch is returned when the old passphrase does not match during rotation.
 	ErrPassphraseMismatch = errors.New("old passphrase does not match current passphrase")
-	ErrEmptyPassphrase    = errors.New("passphrase must not be empty")
+	// ErrEmptyPassphrase is returned when a passphrase is empty.
+	ErrEmptyPassphrase = errors.New("passphrase must not be empty")
 )
 
 // CredentialStore abstracts the persistence layer for encrypted credentials.
@@ -37,9 +39,13 @@ type CredentialManager struct {
 }
 
 // NewCredentialManager creates a new manager bound to the given passphrase
-// and credential store. Optional KDFParams may be provided; if omitted,
-// DefaultKDFParams() is used.
-func NewCredentialManager(passphrase string, cs CredentialStore, opts ...KDFParams) (*CredentialManager, error) {
+// and credential store, using default KDF parameters.
+func NewCredentialManager(passphrase string, cs CredentialStore) (*CredentialManager, error) {
+	return NewCredentialManagerWithParams(passphrase, cs, DefaultKDFParams())
+}
+
+// NewCredentialManagerWithParams creates a new manager with configurable KDF parameters.
+func NewCredentialManagerWithParams(passphrase string, cs CredentialStore, params KDFParams) (*CredentialManager, error) {
 	if passphrase == "" {
 		return nil, ErrEmptyPassphrase
 	}
@@ -196,14 +202,9 @@ func (m *CredentialManager) ValidateAll(ctx context.Context, venueIDs []string) 
 	return results
 }
 
-// ListVenueIDs returns all venue IDs that have stored credentials.
-func (m *CredentialManager) ListVenueIDs(ctx context.Context) ([]string, error) {
-	return m.store.ListVenueIDs(ctx)
-}
-
 // RotatePassphrase re-encrypts all credentials with a new passphrase.
-// It decrypts each credential with the old passphrase, re-encrypts with
-// the new passphrase, and updates the store.
+// It decrypts each credential with the current passphrase and re-encrypts
+// with the new one, then updates the manager's passphrase.
 func (m *CredentialManager) RotatePassphrase(ctx context.Context, oldPassphrase, newPassphrase string) error {
 	if oldPassphrase != m.passphrase {
 		return ErrPassphraseMismatch
@@ -217,9 +218,10 @@ func (m *CredentialManager) RotatePassphrase(ctx context.Context, oldPassphrase,
 		return fmt.Errorf("listing venue IDs: %w", err)
 	}
 
+	// Decrypt all credentials, then re-encrypt with new passphrase.
 	for _, venueID := range venueIDs {
 		if err := m.rotateCredential(ctx, venueID, newPassphrase); err != nil {
-			return fmt.Errorf("rotating credential for %s: %w", venueID, err)
+			return fmt.Errorf("rotating credential %s: %w", venueID, err)
 		}
 	}
 
@@ -227,12 +229,11 @@ func (m *CredentialManager) RotatePassphrase(ctx context.Context, oldPassphrase,
 	return nil
 }
 
-// rotateCredential decrypts a single credential with the current passphrase
-// and re-encrypts it with the new passphrase.
+// rotateCredential decrypts a single credential and re-encrypts with newPassphrase.
 func (m *CredentialManager) rotateCredential(ctx context.Context, venueID, newPassphrase string) error {
 	cred, err := m.Retrieve(ctx, venueID)
 	if err != nil {
-		return fmt.Errorf("retrieving: %w", err)
+		return err
 	}
 
 	salt, err := generateSalt()
@@ -253,7 +254,8 @@ func (m *CredentialManager) rotateCredential(ctx context.Context, venueID, newPa
 		return fmt.Errorf("encrypting API secret: %w", err)
 	}
 
-	var encPassphrase, noncePassphrase []byte
+	var encPassphrase []byte
+	var noncePassphrase []byte
 	if cred.Passphrase != "" {
 		encPassphrase, noncePassphrase, err = encrypt(newKey, []byte(cred.Passphrase))
 		if err != nil {

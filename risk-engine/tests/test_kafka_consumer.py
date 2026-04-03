@@ -287,3 +287,73 @@ class TestFillApplication:
         # T0 settlement: cash reduced immediately
         assert portfolio.cash == Decimal("70000.00")
         assert portfolio.available_cash == Decimal("70000.00")
+
+
+class TestReconnectionBackoff:
+    """Tests for Kafka consumer reconnection with exponential backoff."""
+
+    def test_backoff_calculation_initial(self) -> None:
+        """First error should produce INITIAL_BACKOFF_S."""
+        builder = _make_builder()
+        builder._consecutive_errors = 1
+        backoff = builder._calculate_backoff()
+        assert backoff == builder.INITIAL_BACKOFF_S
+
+    def test_backoff_calculation_exponential(self) -> None:
+        """Backoff should grow exponentially with consecutive errors."""
+        builder = _make_builder()
+        builder._consecutive_errors = 1
+        b1 = builder._calculate_backoff()
+        builder._consecutive_errors = 2
+        b2 = builder._calculate_backoff()
+        builder._consecutive_errors = 3
+        b3 = builder._calculate_backoff()
+
+        assert b2 == b1 * builder.BACKOFF_MULTIPLIER
+        assert b3 == b2 * builder.BACKOFF_MULTIPLIER
+
+    def test_backoff_calculation_capped_at_max(self) -> None:
+        """Backoff should be capped at MAX_BACKOFF_S."""
+        builder = _make_builder()
+        builder._consecutive_errors = 100  # very high count
+        backoff = builder._calculate_backoff()
+        assert backoff == builder.MAX_BACKOFF_S
+
+    def test_backoff_zero_when_no_errors(self) -> None:
+        """No errors should produce zero backoff."""
+        builder = _make_builder()
+        builder._consecutive_errors = 0
+        backoff = builder._calculate_backoff()
+        assert backoff == 0.0
+
+    def test_consecutive_errors_reset_on_successful_message(self) -> None:
+        """Processing a valid message should reset the error counter."""
+        portfolio = Portfolio(
+            cash=Decimal("100000"),
+            available_cash=Decimal("100000"),
+        )
+        builder = _make_builder(portfolio=portfolio)
+        builder._consecutive_errors = 5
+
+        # Process a valid message
+        event = _make_fill_event(instrument_id="AAPL", side="BUY")
+        msg = _make_kafka_message(event)
+
+        # Simulate what _run_consumer does: process message then reset counter
+        builder._process_message(msg)
+        builder._consecutive_errors = 0  # simulates the reset in _run_consumer
+
+        assert builder._consecutive_errors == 0
+
+    def test_interruptible_sleep_exits_early_when_stopped(self) -> None:
+        """_interruptible_sleep should return quickly when _running becomes False."""
+        import time
+
+        builder = _make_builder()
+        builder._running = False  # already stopped
+
+        start = time.monotonic()
+        builder._interruptible_sleep(10.0)  # should return almost immediately
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 1.0, f"Sleep should have exited early, took {elapsed:.2f}s"

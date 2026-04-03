@@ -11,6 +11,8 @@ from __future__ import annotations
 from decimal import Decimal
 from math import sqrt
 
+import time as _time
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -59,68 +61,22 @@ class ParametricVaR:
         6. VaR  = z_{alpha} * portfolio_std * portfolio_value.
         7. CVaR = portfolio_value * portfolio_std * phi(z_{alpha}) / (1 - alpha).
         """
-        with var_computation_seconds.labels(method="parametric").time():
-            # Handle empty portfolio
-            if not positions:
-                return VaRResult(
-                    var_amount=Decimal("0"),
-                    cvar_amount=Decimal("0"),
-                    confidence=self.confidence,
-                    horizon_days=1,
-                    method="parametric",
-                )
-
-            # 1. Filter returns to instruments present in both positions and data
-            instrument_ids = [
-                iid for iid in positions if iid in returns_matrix.columns
-            ]
-            if not instrument_ids:
-                return VaRResult(
-                    var_amount=Decimal("0"),
-                    cvar_amount=Decimal("0"),
-                    confidence=self.confidence,
-                    horizon_days=1,
-                    method="parametric",
-                )
-
-            filtered_returns = returns_matrix[instrument_ids].dropna()
-
-            # 2. Covariance matrix
-            if self.use_shrinkage:
-                cov_matrix = ledoit_wolf_shrinkage(filtered_returns)
-            else:
-                cov_matrix = sample_covariance(filtered_returns)
-
-            # 3. Position weights
-            market_values = np.array(
-                [float(positions[iid].market_value) for iid in instrument_ids]
+        _start = _time.monotonic()
+        try:
+            return self._compute_inner(positions, returns_matrix, base_currency)
+        finally:
+            var_computation_seconds.labels(method="parametric").observe(
+                _time.monotonic() - _start
             )
-            total_value = float(market_values.sum())
-            if total_value == 0.0:
-                return VaRResult(
-                    var_amount=Decimal("0"),
-                    cvar_amount=Decimal("0"),
-                    confidence=self.confidence,
-                    horizon_days=1,
-                    method="parametric",
-                )
 
-            weights = market_values / total_value
-
-            # 4. Portfolio variance: w' * Sigma * w
-            portfolio_variance = float(weights @ cov_matrix @ weights)
-
-            # 5. Portfolio standard deviation
-            portfolio_std = sqrt(max(portfolio_variance, 0.0))
-
-            # 6. VaR = z_alpha * sigma_p * V
-            z_alpha = norm.ppf(self.confidence)
-            var_amount = z_alpha * portfolio_std * total_value
-
-            # 7. CVaR = V * sigma_p * phi(z_alpha) / (1 - alpha)
-            phi_z = norm.pdf(z_alpha)
-            cvar_amount = total_value * portfolio_std * phi_z / (1.0 - self.confidence)
-
+    def _compute_inner(
+        self,
+        positions: dict[str, Position],
+        returns_matrix: pd.DataFrame,
+        base_currency: str = "USD",
+    ) -> VaRResult:
+        # Handle empty portfolio
+        if not positions:
             return VaRResult(
                 var_amount=Decimal(str(round(var_amount, 10))),
                 cvar_amount=Decimal(str(round(cvar_amount, 10))),

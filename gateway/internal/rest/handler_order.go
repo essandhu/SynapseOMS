@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/synapse-oms/gateway/internal/apperror"
 	"github.com/synapse-oms/gateway/internal/domain"
+	"github.com/synapse-oms/gateway/internal/metrics"
 	"github.com/synapse-oms/gateway/internal/store"
 )
 
@@ -187,10 +188,12 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 		VenueID:       venueID,
 	}
 
+	submitStart := time.Now()
 	if err := h.pipeline.Submit(r.Context(), order); err != nil {
 		apperror.WriteError(w, err)
 		return
 	}
+	metrics.OrderLatencySeconds.Observe(time.Since(submitStart).Seconds())
 
 	resp := toOrderResponse(order)
 	w.WriteHeader(http.StatusCreated)

@@ -10,6 +10,7 @@ import (
 	"github.com/synapse-oms/gateway/internal/adapter/alpaca"
 	"github.com/synapse-oms/gateway/internal/adapter/binance"
 	"github.com/synapse-oms/gateway/internal/adapter/simulated"
+	"github.com/synapse-oms/gateway/internal/adapter/tokenized"
 )
 
 // contractSuite runs shared contract tests against any LiquidityProvider.
@@ -177,5 +178,14 @@ func TestBinanceAdapterContract(t *testing.T) {
 	// implementation changes in the future.
 	a := binance.NewAdapter(nil)
 
+	contractSuite(t, a)
+}
+
+// ---------------------------------------------------------------------------
+// Tokenized adapter contract test
+// ---------------------------------------------------------------------------
+
+func TestTokenizedAdapterContract(t *testing.T) {
+	a := tokenized.NewAdapter(nil)
 	contractSuite(t, a)
 }

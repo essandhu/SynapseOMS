@@ -105,10 +105,7 @@ func (s *PostgresStore) ListVenueIDs(ctx context.Context) ([]string, error) {
 		}
 		ids = append(ids, id)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating venue IDs: %w", err)
-	}
-	return ids, nil
+	return ids, rows.Err()
 }
 
 // scanCredential scans a single credential from a pgx.Row.

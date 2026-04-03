@@ -19,19 +19,59 @@ import type {
   RebalanceResult,
 } from "./types";
 
+/**
+ * Error handler hook that fires a CustomEvent for UI toast notifications.
+ * Components can listen for "api-error" events to display user-friendly messages.
+ */
+const afterResponseErrorHook = (
+  _request: Request,
+  _options: unknown,
+  response: Response,
+): void => {
+  if (typeof window !== "undefined" && response.status >= 400) {
+    window.dispatchEvent(
+      new CustomEvent("api-error", {
+        detail: {
+          status: response.status,
+          url: response.url,
+          message: `Request failed: ${response.status} ${response.statusText}`,
+        },
+      }),
+    );
+  }
+};
+
 const api = ky.create({
   prefixUrl: import.meta.env.VITE_API_URL || "/api",
   timeout: 10_000,
+  retry: {
+    limit: 3,
+    methods: ["get", "head", "options"],
+    statusCodes: [408, 500, 502, 503, 504],
+    backoffLimit: 3000,
+  },
   headers: {
     "Content-Type": "application/json",
+  },
+  hooks: {
+    afterResponse: [afterResponseErrorHook as never],
   },
 });
 
 const riskApi = ky.create({
   prefixUrl: import.meta.env.VITE_RISK_API_URL || "http://localhost:8081",
   timeout: 10_000,
+  retry: {
+    limit: 3,
+    methods: ["get", "head", "options"],
+    statusCodes: [408, 500, 502, 503, 504],
+    backoffLimit: 3000,
+  },
   headers: {
     "Content-Type": "application/json",
+  },
+  hooks: {
+    afterResponse: [afterResponseErrorHook as never],
   },
 });
 

@@ -1,0 +1,24 @@
+services:
+  gateway:
+    environment:
+      - LOG_LEVEL=debug
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # Delve debugger
+
+  dashboard:
+    volumes:
+      - ../dashboard/src:/app/src
+    environment:
+      - VITE_HMR=true
+
+  risk-engine:
+    environment:
+      - LOG_LEVEL=debug
+      - PYTHONDONTWRITEBYTECODE=1
+    ports:
+      - "8081:8081"
+      - "50051:50051"
+      - "5678:5678"  # debugpy
+    volumes:
+      - ../risk-engine/risk_engine:/app/risk_engine

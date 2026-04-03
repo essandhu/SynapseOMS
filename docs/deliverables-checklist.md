@@ -31,7 +31,7 @@
 - [x] gateway/internal/adapter/binance/ws_feed.go (Binance WebSocket market data feed)
 - [x] gateway/internal/adapter/simulated/matching_engine.go (simulated multi-asset matching engine)
 - [x] gateway/internal/adapter/simulated/price_walk.go (geometric Brownian motion price generator)
-- [ ] gateway/internal/adapter/tokenized/adapter.go (tokenized securities adapter, T+0 settlement)
+- [x] gateway/internal/adapter/tokenized/adapter.go (tokenized securities adapter, T+0 settlement — 13 tests)
 - [x] gateway/internal/credential/manager.go (encrypt/decrypt with Argon2id + AES-256-GCM)
 - [x] gateway/internal/credential/vault.go (on-disk encrypted storage in PostgreSQL)
 - [x] gateway/internal/pipeline/pipeline.go (intake -> risk check -> route -> fill -> notify)
@@ -126,40 +126,40 @@
 
 ## Infrastructure
 
-- [x] deploy/docker-compose.yml (gateway, risk-engine, dashboard, ml-scorer, kafka, postgres, redis) — Phase 3: added ml-scorer sidecar
-- [ ] deploy/docker-compose.dev.yml (dev overrides: hot reload, debug ports)
-- [ ] deploy/k8s/namespace.yaml
-- [ ] deploy/k8s/gateway-deployment.yaml
-- [ ] deploy/k8s/risk-engine-deployment.yaml
-- [ ] deploy/k8s/dashboard-deployment.yaml
-- [ ] deploy/k8s/kafka-statefulset.yaml
-- [ ] deploy/k8s/postgres-statefulset.yaml
-- [ ] deploy/k8s/redis-deployment.yaml
-- [ ] deploy/k8s/monitoring/prometheus-config.yaml
-- [ ] deploy/k8s/monitoring/grafana-dashboards.yaml
-- [ ] deploy/grafana/system-overview.json (pre-built Grafana dashboard)
-- [ ] deploy/grafana/venue-performance.json (per-venue performance dashboard)
-- [ ] deploy/prometheus.yml (Prometheus scrape config for gateway + risk-engine metrics)
-- [ ] loadtest/k6/order_flow.js (realistic order submission load test, 5k orders/sec target)
-- [ ] loadtest/k6/ws_stream.js (WebSocket streaming load test)
-- [ ] loadtest/README.md
+- [x] deploy/docker-compose.yml (all services + prometheus/grafana monitoring profile) — Phase 5: restart policies, monitoring
+- [x] deploy/docker-compose.dev.yml (dev overrides: hot reload, debug ports)
+- [x] deploy/k8s/namespace.yaml
+- [x] deploy/k8s/gateway-deployment.yaml
+- [x] deploy/k8s/risk-engine-deployment.yaml
+- [x] deploy/k8s/dashboard-deployment.yaml
+- [x] deploy/k8s/kafka-statefulset.yaml
+- [x] deploy/k8s/postgres-statefulset.yaml
+- [x] deploy/k8s/redis-deployment.yaml
+- [x] deploy/k8s/monitoring/prometheus-config.yaml
+- [x] deploy/k8s/monitoring/grafana-dashboards.yaml
+- [x] deploy/grafana/system-overview.json (9-panel Grafana dashboard)
+- [x] deploy/grafana/venue-performance.json (4-panel per-venue dashboard)
+- [x] deploy/prometheus.yml (Prometheus scrape config for gateway + risk-engine)
+- [x] loadtest/k6/order_flow.js (5k orders/sec, p99<50ms threshold)
+- [x] loadtest/k6/ws_stream.js (1000 concurrent WebSocket clients)
+- [x] loadtest/README.md
 - [x] Makefile (top-level build targets)
 
 ## Scripts
 
 - [x] scripts/proto-gen.sh (generate Go + Python + TS from protos using buf)
 - [x] scripts/seed-instruments.sh (seed instrument reference data: AAPL, MSFT, GOOG, BTC-USD, ETH-USD, SOL-USD)
-- [ ] scripts/health-check.sh (verify all services healthy)
+- [x] scripts/health-check.sh (verify all services healthy)
 
 ## Documentation
 
-- [ ] README.md (product-first: problem statement, who is this for, features, quickstart, screenshots)
-- [ ] docs/quickstart.md (git clone -> running in 3 minutes with simulated venue)
-- [ ] docs/connect-venue.md (Alpaca paper trading + Binance testnet setup, security explanation)
-- [ ] docs/write-adapter.md (contributor guide: implement LiquidityProvider, register, pass contract tests)
-- [ ] docs/architecture-overview.md (visual architecture for contributors)
-- [ ] LICENSE (AGPLv3)
-- [ ] CONTRIBUTING.md
+- [x] README.md (product-first: problem statement, quickstart, features, doc links)
+- [x] docs/quickstart.md (6-step guide from clone to running)
+- [x] docs/connect-venue.md (Alpaca paper + Binance testnet, security explanation)
+- [x] docs/write-adapter.md (LiquidityProvider skeleton, contract tests, step-by-step)
+- [x] docs/architecture-overview.md (Mermaid diagram, service descriptions, data flow)
+- [x] LICENSE (AGPLv3)
+- [x] CONTRIBUTING.md
 
 ## CI/CD
 
@@ -174,8 +174,8 @@
 - [x] gateway/internal/adapter/alpaca/adapter_test.go (Alpaca adapter unit tests — 21 tests)
 - [x] gateway/internal/adapter/binance/adapter_test.go (Binance adapter unit tests — 21 tests)
 - [x] gateway/internal/adapter/simulated/matching_engine_test.go (simulated exchange unit tests)
-- [ ] gateway/internal/adapter/tokenized/adapter_test.go (tokenized adapter unit tests)
-- [x] gateway/internal/credential/manager_test.go (credential manager unit tests — 6 tests)
+- [x] gateway/internal/adapter/tokenized/adapter_test.go (tokenized adapter unit tests — 13 tests)
+- [x] gateway/internal/credential/manager_test.go (credential manager unit tests — 13 tests)
 - [x] gateway/internal/pipeline/pipeline_test.go (pipeline unit tests)
 - [x] gateway/internal/domain/order_test.go (order state machine transition tests)
 - [ ] risk_engine/var/var_test.py (VaR module-level tests)

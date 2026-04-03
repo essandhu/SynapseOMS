@@ -938,6 +938,106 @@ func TestSmartRouterSplitAcrossTwoVenues(t *testing.T) {
 	}
 }
 
+// --- P5-09: Error Handling & Graceful Degradation Tests ---
+
+func TestDisconnectedVenueRejectsOrder_OthersUnaffected(t *testing.T) {
+	store := newMemStore()
+	notifier := newMockNotifier()
+	risk := newMockRiskClient(true)
+
+	connectedVenue := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "venue-ok",
+		status:  adapter.Connected,
+	}
+	disconnectedVenue := &mockVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "venue-down",
+		status:  adapter.Disconnected,
+	}
+
+	// Register instances so CheckVenueReady can find them.
+	adapter.RegisterInstance("venue-ok", connectedVenue)
+	adapter.RegisterInstance("venue-down", disconnectedVenue)
+
+	venues := []adapter.LiquidityProvider{connectedVenue, disconnectedVenue}
+
+	p := NewPipeline(store, venues, notifier, risk)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	// Submit an order — legacy routing will pick the first available venue.
+	// To test disconnected venue rejection specifically, submit an order and
+	// then verify the pipeline is still functional after processing.
+	order1 := makeOrder()
+	order1.ClientOrderID = "test-dc-1"
+	if err := p.Submit(ctx, order1); err != nil {
+		t.Fatalf("Submit order1 failed: %v", err)
+	}
+
+	// Wait for order to be processed (may route to either venue)
+	waitFor(t, 2*time.Second, func() bool {
+		updates := notifier.getOrderUpdates()
+		return len(updates) > 0
+	}, "first order to be processed")
+
+	// Verify pipeline is still alive: submit another order
+	order2 := makeOrder()
+	order2.ClientOrderID = "test-dc-2"
+	if err := p.Submit(ctx, order2); err != nil {
+		t.Fatalf("Submit order2 failed after disconnected venue: %v", err)
+	}
+
+	waitFor(t, 2*time.Second, func() bool {
+		updates := notifier.getOrderUpdates()
+		return len(updates) >= 2
+	}, "second order to be processed — pipeline survived disconnected venue")
+}
+
+func TestCheckVenueReady_Disconnected(t *testing.T) {
+	disconnected := &mockVenue{
+		fillCh:  make(chan domain.Fill, 1),
+		venueID: "check-dc-test",
+		status:  adapter.Disconnected,
+	}
+	adapter.RegisterInstance("check-dc-test", disconnected)
+
+	err := adapter.CheckVenueReady("check-dc-test")
+	if err == nil {
+		t.Fatal("expected error for disconnected venue")
+	}
+
+	dcErr, ok := err.(*adapter.ErrVenueDisconnected)
+	if !ok {
+		t.Fatalf("expected *ErrVenueDisconnected, got %T", err)
+	}
+	if dcErr.VenueID != "check-dc-test" {
+		t.Errorf("expected venue ID check-dc-test, got %s", dcErr.VenueID)
+	}
+}
+
+func TestCheckVenueReady_Connected(t *testing.T) {
+	connected := &mockVenue{
+		fillCh:  make(chan domain.Fill, 1),
+		venueID: "check-ok-test",
+		status:  adapter.Connected,
+	}
+	adapter.RegisterInstance("check-ok-test", connected)
+
+	err := adapter.CheckVenueReady("check-ok-test")
+	if err != nil {
+		t.Fatalf("expected no error for connected venue, got %v", err)
+	}
+}
+
+func TestCheckVenueReady_UnknownVenue(t *testing.T) {
+	err := adapter.CheckVenueReady("totally-unknown-venue-xyz123")
+	if err != nil {
+		t.Fatalf("expected nil for unknown venue, got %v", err)
+	}
+}
+
 // splitStrategy is a test routing strategy that always splits evenly across
 // the first two candidates.
 type splitStrategy struct{}

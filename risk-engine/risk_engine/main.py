@@ -27,7 +27,7 @@ import numpy as np
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import make_asgi_app
+from prometheus_client import make_asgi_app as _make_metrics_app
 
 from risk_engine.concentration.analyzer import ConcentrationAnalyzer
 from risk_engine.domain.portfolio import Portfolio
@@ -293,12 +293,8 @@ app.include_router(optimizer_router)
 app.include_router(anomaly_router)
 app.include_router(ai_router)
 
-# ---------------------------------------------------------------------------
-# Prometheus metrics endpoint
-# ---------------------------------------------------------------------------
-
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+# Mount Prometheus metrics endpoint
+app.mount("/metrics", _make_metrics_app())
 
 
 # ---------------------------------------------------------------------------

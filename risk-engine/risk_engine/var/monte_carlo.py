@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from math import sqrt
 
+import time as _time
+
 import numpy as np
 from scipy.stats import t as student_t
 
@@ -104,9 +106,25 @@ class MonteCarloVaR:
             With ``var_amount``, ``cvar_amount``, and the full ``distribution``
             array of simulated portfolio P&L values.
         """
-        with var_computation_seconds.labels(method="monte_carlo").time():
-            n_instruments = len(positions)
-            n_sims = self.num_simulations
+        _start = _time.monotonic()
+        try:
+            return self._compute_inner(
+                positions, covariance_matrix, expected_returns, distribution_params
+            )
+        finally:
+            var_computation_seconds.labels(method="monte_carlo").observe(
+                _time.monotonic() - _start
+            )
+
+    def _compute_inner(
+        self,
+        positions: list[Position],
+        covariance_matrix: np.ndarray,
+        expected_returns: np.ndarray,
+        distribution_params: list[DistributionParams],
+    ) -> VaRResult:
+        n_instruments = len(positions)
+        n_sims = self.num_simulations
 
             # Market values per instrument
             market_values = np.array(

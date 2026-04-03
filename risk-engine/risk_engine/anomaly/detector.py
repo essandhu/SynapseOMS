@@ -92,6 +92,7 @@ class StreamingAnomalyDetector:
         severity = self._determine_severity(score)
         anomalies_detected_total.inc()
         feat_dict = dict(zip(_FEATURE_NAMES, features.tolist(), strict=True))
+        anomalies_detected_total.inc()
         return AnomalyAlert(
             id=str(uuid.uuid4()),
             instrument_id=snapshot["instrument_id"],

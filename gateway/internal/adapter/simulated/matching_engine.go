@@ -253,6 +253,41 @@ func newFillID() string {
 	return fmt.Sprintf("fill-%x", b)
 }
 
+// CancelOrder removes an order from all order books by its ID.
+func (me *MatchingEngine) CancelOrder(orderID domain.OrderID) {
+	me.mu.RLock()
+	defer me.mu.RUnlock()
+	for _, book := range me.books {
+		book.mu.Lock()
+		remaining := make([]*domain.Order, 0, len(book.orders))
+		for _, o := range book.orders {
+			if o.ID != orderID {
+				remaining = append(remaining, o)
+			}
+		}
+		book.orders = remaining
+		book.mu.Unlock()
+	}
+}
+
+// FindOrder searches all order books for an order matching the venue order ID.
+// The prefix is stripped from venueOrderID to match against the order's ID.
+func (me *MatchingEngine) FindOrder(venueOrderID, prefix string) *domain.Order {
+	me.mu.RLock()
+	defer me.mu.RUnlock()
+	for _, book := range me.books {
+		book.mu.Lock()
+		for _, o := range book.orders {
+			if fmt.Sprintf("%s%s", prefix, o.ID) == venueOrderID {
+				book.mu.Unlock()
+				return o
+			}
+		}
+		book.mu.Unlock()
+	}
+	return nil
+}
+
 // slippageBps returns the slippage in basis points between two prices.
 func slippageBps(original, filled decimal.Decimal) float64 {
 	if original.IsZero() {

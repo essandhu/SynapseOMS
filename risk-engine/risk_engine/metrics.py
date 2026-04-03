@@ -1,6 +1,4 @@
-"""Prometheus metric definitions for the Risk Engine service."""
-
-from __future__ import annotations
+"""Prometheus metrics for the Risk Engine service."""
 
 from prometheus_client import Counter, Gauge, Histogram
 

@@ -10,6 +10,38 @@ import type {
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
 const RISK_WS = import.meta.env.VITE_RISK_WS_URL || "ws://localhost:8081";
 
+/** Connection state for UI indicators. */
+export type ConnectionState = "connected" | "disconnected" | "reconnecting";
+
+/** Callback invoked when any WebSocket stream changes connection state. */
+export type ConnectionStateCallback = (
+  stream: string,
+  state: ConnectionState,
+) => void;
+
+/**
+ * Attaches open/close/error listeners to a ReconnectingWebSocket that
+ * invoke the provided callback with the current connection state.
+ * This enables the UI to display "Connection lost, reconnecting..." banners.
+ */
+function attachConnectionStateListeners(
+  ws: ReconnectingWebSocket,
+  streamName: string,
+  onStateChange?: ConnectionStateCallback,
+): void {
+  if (!onStateChange) return;
+
+  ws.addEventListener("open", () => {
+    onStateChange(streamName, "connected");
+  });
+  ws.addEventListener("close", () => {
+    onStateChange(streamName, "reconnecting");
+  });
+  ws.addEventListener("error", () => {
+    onStateChange(streamName, "disconnected");
+  });
+}
+
 /**
  * Creates a WebSocket connection for real-time order updates.
  * Automatically reconnects on disconnect.
@@ -120,6 +152,10 @@ export function createAnomalyStream(
 /**
  * Initialize all WebSocket streams and return a cleanup function.
  * Connects order, position, risk, and venue streams simultaneously.
+ *
+ * When `onConnectionStateChange` is provided, it is called whenever any
+ * stream connects, disconnects, or begins reconnecting. The UI can use
+ * this to display a "Connection lost, reconnecting..." banner.
  */
 export function initializeStreams(handlers: {
   onOrderUpdate: (update: OrderUpdate) => void;
@@ -127,16 +163,24 @@ export function initializeStreams(handlers: {
   onRiskUpdate: (update: RiskUpdate) => void;
   onVenueUpdate: (update: VenueStatusUpdate) => void;
   onAnomalyAlert?: (alert: AnomalyAlert) => void;
+  onConnectionStateChange?: ConnectionStateCallback;
 }): () => void {
-  const streams: ReconnectingWebSocket[] = [
-    createOrderStream(handlers.onOrderUpdate),
-    createPositionStream(handlers.onPositionUpdate),
-    createRiskStream(handlers.onRiskUpdate),
-    createVenueStream(handlers.onVenueUpdate),
-  ];
+  const orderWs = createOrderStream(handlers.onOrderUpdate);
+  const positionWs = createPositionStream(handlers.onPositionUpdate);
+  const riskWs = createRiskStream(handlers.onRiskUpdate);
+  const venueWs = createVenueStream(handlers.onVenueUpdate);
+
+  attachConnectionStateListeners(orderWs, "orders", handlers.onConnectionStateChange);
+  attachConnectionStateListeners(positionWs, "positions", handlers.onConnectionStateChange);
+  attachConnectionStateListeners(riskWs, "risk", handlers.onConnectionStateChange);
+  attachConnectionStateListeners(venueWs, "venues", handlers.onConnectionStateChange);
+
+  const streams: ReconnectingWebSocket[] = [orderWs, positionWs, riskWs, venueWs];
 
   if (handlers.onAnomalyAlert) {
-    streams.push(createAnomalyStream(handlers.onAnomalyAlert));
+    const anomalyWs = createAnomalyStream(handlers.onAnomalyAlert);
+    attachConnectionStateListeners(anomalyWs, "anomalies", handlers.onConnectionStateChange);
+    streams.push(anomalyWs);
   }
 
   return () => {

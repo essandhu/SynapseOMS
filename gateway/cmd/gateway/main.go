@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 	"github.com/spf13/viper"
@@ -19,6 +20,7 @@ import (
 	_ "github.com/synapse-oms/gateway/internal/adapter/alpaca"
 	_ "github.com/synapse-oms/gateway/internal/adapter/binance"
 	_ "github.com/synapse-oms/gateway/internal/adapter/simulated"
+	_ "github.com/synapse-oms/gateway/internal/metrics" // register Prometheus metrics
 	"github.com/synapse-oms/gateway/internal/credential"
 	"github.com/synapse-oms/gateway/internal/crossing"
 	"github.com/synapse-oms/gateway/internal/domain"
@@ -348,6 +350,7 @@ func main() {
 	// Mount WebSocket upgrade endpoints on the same mux.
 	mux := http.NewServeMux()
 	mux.Handle("/", restRouter)
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/ws/orders", wsSrv.HandleOrders)
 	mux.HandleFunc("/ws/positions", wsSrv.HandlePositions)
 	mux.HandleFunc("/ws/venues", wsSrv.HandleVenues)

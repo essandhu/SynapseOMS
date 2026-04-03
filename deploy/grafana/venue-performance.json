@@ -1,0 +1,119 @@
+{
+  "uid": "synapse-venue-performance",
+  "title": "SynapseOMS — Venue Performance",
+  "tags": ["synapse", "venues"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      },
+      {
+        "name": "venue",
+        "type": "query",
+        "query": "label_values(gateway_venue_status, venue)",
+        "datasource": { "uid": "${DS_PROMETHEUS}" },
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Venue Latency by Venue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(gateway_venue_latency_seconds_bucket{venue=~\"$venue\"}[5m])) by (le, venue))",
+          "legendFormat": "{{venue}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gateway_venue_latency_seconds_bucket{venue=~\"$venue\"}[5m])) by (le, venue))",
+          "legendFormat": "{{venue}} p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 5 }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Venue Status",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "gateway_venue_status{venue=~\"$venue\"}",
+          "legendFormat": "{{venue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Disconnected", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "Connected", "color": "green" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Fills by Venue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_fills_received_total{venue=~\"$venue\"}[1m])) by (venue)",
+          "legendFormat": "{{venue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "fillOpacity": 20 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Orders by Venue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_orders_submitted_total{venue=~\"$venue\"}[1m])) by (venue)",
+          "legendFormat": "{{venue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "fillOpacity": 20 }
+        }
+      }
+    }
+  ]
+}

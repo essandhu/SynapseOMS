@@ -15,12 +15,12 @@ const (
 	nonceLen = 12
 )
 
-// KDFParams holds configurable Argon2id parameters.
+// KDFParams holds configurable Argon2id key derivation parameters.
 type KDFParams struct {
-	Time    uint32
-	Memory  uint32 // in KB
-	Threads uint8
-	KeyLen  uint32
+	Time    uint32 // number of iterations
+	Memory  uint32 // memory in KB
+	Threads uint8  // parallelism
+	KeyLen  uint32 // derived key length in bytes
 }
 
 // DefaultKDFParams returns the default Argon2id parameters.
@@ -28,13 +28,12 @@ func DefaultKDFParams() KDFParams {
 	return KDFParams{Time: 1, Memory: 64 * 1024, Threads: 4, KeyLen: 32}
 }
 
-// deriveKeyWithParams derives a key using configurable params.
+// deriveKeyWithParams derives an encryption key using configurable params.
 func deriveKeyWithParams(passphrase string, salt []byte, params KDFParams) []byte {
 	return argon2.IDKey([]byte(passphrase), salt, params.Time, params.Memory, params.Threads, params.KeyLen)
 }
 
-// deriveKey derives a 256-bit encryption key from the passphrase and salt
-// using Argon2id with default parameters.
+// deriveKey derives a 256-bit encryption key using default parameters.
 func deriveKey(passphrase string, salt []byte) []byte {
 	return deriveKeyWithParams(passphrase, salt, DefaultKDFParams())
 }
