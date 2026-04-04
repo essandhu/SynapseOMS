@@ -1,4 +1,4 @@
-export { makeOrder, mockOrders } from "./orders";
+export { makeOrder, mockOrders, toRawOrder } from "./orders";
 export { mockPositions } from "./positions";
 export { mockVenues } from "./venues";
 export { mockInstruments } from "./instruments";

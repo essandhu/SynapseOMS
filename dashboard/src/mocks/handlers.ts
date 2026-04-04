@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 import {
   mockOrders,
   makeOrder,
+  toRawOrder,
   mockPositions,
   mockVenues,
   mockInstruments,
@@ -24,7 +25,9 @@ import {
 // ---------------------------------------------------------------------------
 
 const gatewayHandlers = [
-  http.get("*/api/v1/orders", () => HttpResponse.json(mockOrders)),
+  http.get("*/api/v1/orders", () =>
+    HttpResponse.json(mockOrders.map(toRawOrder)),
+  ),
 
   http.get("*/api/v1/orders/:id", ({ params }) => {
     const order = mockOrders.find((o) => o.id === params.id);
@@ -33,7 +36,7 @@ const gatewayHandlers = [
         { error: { code: "NOT_FOUND", message: "Order not found" } },
         { status: 404 },
       );
-    return HttpResponse.json(order);
+    return HttpResponse.json(toRawOrder(order));
   }),
 
   http.post("*/api/v1/orders", async ({ request }) => {
@@ -48,7 +51,7 @@ const gatewayHandlers = [
       venueId: ((body.venue_id ?? body.venueId) as string) || "smart",
       status: "new",
     });
-    return HttpResponse.json(order, { status: 201 });
+    return HttpResponse.json(toRawOrder(order), { status: 201 });
   }),
 
   http.delete("*/api/v1/orders/:id", () => new HttpResponse(null, { status: 204 })),

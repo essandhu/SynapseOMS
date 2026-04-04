@@ -19,6 +19,40 @@ export const makeOrder = (overrides: Partial<Order> = {}): Order => ({
   ...overrides,
 });
 
+/**
+ * Converts a camelCase Order to the snake_case JSON the Go backend actually returns.
+ * Used by MSW handlers to realistically simulate backend responses.
+ */
+export function toRawOrder(order: Order): Record<string, unknown> {
+  return {
+    id: order.id,
+    client_order_id: order.clientOrderId,
+    instrument_id: order.instrumentId,
+    side: order.side,
+    type: order.type,
+    quantity: order.quantity,
+    price: order.price,
+    filled_quantity: order.filledQuantity,
+    average_price: order.averagePrice,
+    status: order.status,
+    asset_class: order.assetClass,
+    venue_id: order.venueId,
+    created_at: order.createdAt,
+    updated_at: order.updatedAt,
+    fills: order.fills.map((f) => ({
+      id: f.id,
+      order_id: f.orderId,
+      venue_id: f.venueId,
+      quantity: f.quantity,
+      price: f.price,
+      fee: f.fee,
+      fee_asset: f.feeAsset,
+      liquidity: f.liquidity,
+      timestamp: f.timestamp,
+    })),
+  };
+}
+
 export const mockOrders: Order[] = [
   makeOrder({ id: "order-1", status: "new" }),
   makeOrder({ id: "order-2", status: "filled", instrumentId: "TSLA" }),

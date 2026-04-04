@@ -18,6 +18,7 @@ import type {
   AnomalyAlert,
   RebalanceResult,
 } from "./types";
+import { mapOrder } from "./mappers";
 
 /**
  * Error handler hook that fires a CustomEvent for UI toast notifications.
@@ -77,17 +78,19 @@ const riskApi = ky.create({
 
 /** Fetch all orders */
 export async function fetchOrders(): Promise<Order[]> {
-  return api.get("orders").json<Order[]>();
+  const raw = await api.get("orders").json<unknown[]>();
+  return raw.map(mapOrder);
 }
 
 /** Fetch a single order by ID */
 export async function fetchOrder(id: string): Promise<Order> {
-  return api.get(`orders/${id}`).json<Order>();
+  const raw = await api.get(`orders/${id}`).json<unknown>();
+  return mapOrder(raw);
 }
 
 /** Submit a new order */
 export async function submitOrder(request: SubmitOrderRequest): Promise<Order> {
-  return api
+  const raw = await api
     .post("orders", {
       json: {
         instrument_id: request.instrumentId,
@@ -98,7 +101,8 @@ export async function submitOrder(request: SubmitOrderRequest): Promise<Order> {
         venue_id: request.venueId,
       },
     })
-    .json<Order>();
+    .json<unknown>();
+  return mapOrder(raw);
 }
 
 /** Cancel an order by ID */

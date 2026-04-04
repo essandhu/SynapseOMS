@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -38,6 +40,7 @@ type orderResponse struct {
 	FilledQuantity  string         `json:"filled_quantity"`
 	AveragePrice    string         `json:"average_price"`
 	Status          string         `json:"status"`
+	AssetClass      string         `json:"asset_class,omitempty"`
 	VenueID         string         `json:"venue_id,omitempty"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
@@ -67,6 +70,7 @@ func toOrderResponse(o *domain.Order) orderResponse {
 		FilledQuantity: o.FilledQuantity.String(),
 		AveragePrice:   o.AveragePrice.String(),
 		Status:         statusToString(o.Status),
+		AssetClass:     assetClassStr(o.AssetClass),
 		VenueID:        o.VenueID,
 		CreatedAt:      o.CreatedAt,
 		UpdatedAt:      o.UpdatedAt,
@@ -272,14 +276,21 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	clientOrderID := strings.TrimSpace(req.ClientOrderID)
+	if clientOrderID == "" {
+		clientOrderID = newClientOrderID()
+	}
+
 	order := &domain.Order{
-		InstrumentID:  req.InstrumentID,
-		ClientOrderID: req.ClientOrderID,
-		Side:          side,
-		Type:          orderType,
-		Quantity:      quantity,
-		Price:         price,
-		VenueID:       venueID,
+		InstrumentID:    req.InstrumentID,
+		ClientOrderID:   clientOrderID,
+		Side:            side,
+		Type:            orderType,
+		Quantity:        quantity,
+		Price:           price,
+		VenueID:         venueID,
+		AssetClass:      inst.AssetClass,
+		SettlementCycle: inst.SettlementCycle,
 	}
 
 	submitStart := time.Now()
@@ -407,6 +418,13 @@ func statusToString(s domain.OrderStatus) string {
 	default:
 		return "new"
 	}
+}
+
+// newClientOrderID generates a unique client order ID when one is not provided.
+func newClientOrderID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("auto-%x", b)
 }
 
 func stringToStatus(s string) domain.OrderStatus {

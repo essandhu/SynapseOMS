@@ -188,6 +188,50 @@ func TestSubmitOrder_Success(t *testing.T) {
 	if resp["quantity"] != "10" {
 		t.Errorf("expected quantity '10', got %v (type %T)", resp["quantity"], resp["quantity"])
 	}
+	// Asset class should be populated from instrument
+	if resp["asset_class"] != "equity" {
+		t.Errorf("expected asset_class 'equity', got %v", resp["asset_class"])
+	}
+}
+
+func TestSubmitOrder_PopulatesAssetClassFromInstrument(t *testing.T) {
+	venueID := "test-order-venue-crypto"
+	mlp := &mockLiquidityProvider{
+		venueID:      venueID,
+		venueName:    "Crypto Exchange",
+		status:       adapter.Connected,
+		assetClasses: []domain.AssetClass{domain.AssetClassCrypto},
+	}
+	adapter.RegisterInstance(venueID, mlp)
+
+	ms := &mockStore{
+		instruments: []domain.Instrument{
+			{ID: "BTC-USD", Symbol: "BTC-USD", Name: "Bitcoin", AssetClass: domain.AssetClassCrypto},
+		},
+	}
+	mp := &mockPipeline{}
+
+	router := setupRouter(ms, mp)
+
+	body := `{"instrument_id":"BTC-USD","side":"buy","type":"market","quantity":"1.5","price":"0"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	decodeJSON(t, rec.Result(), &resp)
+
+	if resp["asset_class"] != "crypto" {
+		t.Errorf("expected asset_class 'crypto', got %v", resp["asset_class"])
+	}
+	if resp["instrument_id"] != "BTC-USD" {
+		t.Errorf("expected instrument_id 'BTC-USD', got %v", resp["instrument_id"])
+	}
 }
 
 func TestSubmitOrder_ValidationErrors(t *testing.T) {

@@ -72,6 +72,7 @@ func TestWebSocketOrderBroadcast(t *testing.T) {
 		FilledQuantity: decimal.NewFromInt(10),
 		AveragePrice:   decimal.NewFromFloat(150.50),
 		Status:         domain.OrderStatusFilled,
+		AssetClass:     domain.AssetClassEquity,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}
@@ -111,6 +112,9 @@ func TestWebSocketOrderBroadcast(t *testing.T) {
 	}
 	if dataMap["status"] != "filled" {
 		t.Errorf("expected status filled, got %v", dataMap["status"])
+	}
+	if dataMap["asset_class"] != "equity" {
+		t.Errorf("expected asset_class equity, got %v", dataMap["asset_class"])
 	}
 }
 

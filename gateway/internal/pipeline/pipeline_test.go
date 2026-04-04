@@ -128,8 +128,9 @@ func newMockVenue() *mockVenue {
 	}
 }
 
-func (v *mockVenue) VenueID() string  { return v.venueID }
+func (v *mockVenue) VenueID() string   { return v.venueID }
 func (v *mockVenue) VenueName() string { return "Mock Venue" }
+func (v *mockVenue) VenueType() string { return "simulated" }
 func (v *mockVenue) SupportedAssetClasses() []domain.AssetClass {
 	return []domain.AssetClass{domain.AssetClassEquity, domain.AssetClassCrypto}
 }
@@ -1036,6 +1037,149 @@ func TestCheckVenueReady_UnknownVenue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil for unknown venue, got %v", err)
 	}
+}
+
+// TestSynchronousFillDuringSubmitOrder verifies that fills generated
+// synchronously during SubmitOrder() (as the simulated exchange does for
+// market orders) are correctly applied. This tests the fix for the race
+// condition where venueDispatch previously transitioned to Acknowledged
+// AFTER SubmitOrder, causing ApplyFill to reject fills for New orders.
+func TestSynchronousFillDuringSubmitOrder(t *testing.T) {
+	store := newMemStore()
+	notifier := newMockNotifier()
+
+	// Create a venue that sends a fill synchronously during SubmitOrder,
+	// mimicking the real simulated exchange behavior.
+	venue := &syncFillVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "sim-exchange",
+		status:  adapter.Connected,
+	}
+
+	p := makePipelineWith(store, venue, notifier)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// The fill was sent synchronously during SubmitOrder.
+	// Wait for the order to reach Filled status.
+	waitFor(t, 5*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusFilled
+	}, "order to be filled after synchronous fill during SubmitOrder")
+
+	// Verify fill details
+	o := store.getOrder(order.ID)
+	if !o.FilledQuantity.Equal(decimal.NewFromInt(100)) {
+		t.Errorf("expected filled quantity 100, got %s", o.FilledQuantity)
+	}
+	if o.AveragePrice.IsZero() {
+		t.Error("expected non-zero average price")
+	}
+}
+
+// TestOrderPersistedBeforeRESTResponse verifies that an order is persisted
+// to the database during Submit() so that it's available via GET /orders
+// immediately after the REST handler returns 201.
+func TestOrderPersistedBeforeRESTResponse(t *testing.T) {
+	store := newMemStore()
+	venue := newMockVenue()
+	notifier := newMockNotifier()
+
+	p := makePipeline(store, venue, notifier)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Note: we do NOT call p.Start(ctx) — we want to verify the order
+	// is persisted synchronously during Submit, not by a background goroutine.
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// The order must be in the store IMMEDIATELY after Submit returns,
+	// without any background goroutine having run.
+	o := store.getOrder(order.ID)
+	if o == nil {
+		t.Fatal("order not found in store immediately after Submit — would be lost on page refresh")
+	}
+	if o.Status != domain.OrderStatusNew {
+		t.Errorf("expected status New, got %d", o.Status)
+	}
+	if o.InstrumentID != "AAPL" {
+		t.Errorf("expected instrument AAPL, got %s", o.InstrumentID)
+	}
+}
+
+// syncFillVenue is a mock venue that sends fills synchronously during
+// SubmitOrder, mimicking the real simulated exchange behavior.
+type syncFillVenue struct {
+	mu      sync.Mutex
+	fillCh  chan domain.Fill
+	venueID string
+	status  adapter.VenueStatus
+}
+
+func (v *syncFillVenue) VenueID() string   { return v.venueID }
+func (v *syncFillVenue) VenueName() string { return "Sync Fill Venue" }
+func (v *syncFillVenue) VenueType() string { return "simulated" }
+func (v *syncFillVenue) SupportedAssetClasses() []domain.AssetClass {
+	return []domain.AssetClass{domain.AssetClassEquity, domain.AssetClassCrypto}
+}
+func (v *syncFillVenue) SupportedInstruments() ([]domain.Instrument, error) { return nil, nil }
+func (v *syncFillVenue) Connect(_ context.Context, _ domain.VenueCredential) error {
+	v.status = adapter.Connected
+	return nil
+}
+func (v *syncFillVenue) Disconnect(_ context.Context) error {
+	v.status = adapter.Disconnected
+	return nil
+}
+func (v *syncFillVenue) Status() adapter.VenueStatus                   { return v.status }
+func (v *syncFillVenue) Ping(_ context.Context) (time.Duration, error) { return 0, nil }
+
+func (v *syncFillVenue) SubmitOrder(_ context.Context, order *domain.Order) (*adapter.VenueAck, error) {
+	// Send fill SYNCHRONOUSLY during SubmitOrder, exactly like the simulated exchange.
+	fill := domain.Fill{
+		ID:          "sync-fill-1",
+		OrderID:     order.ID,
+		VenueID:     v.venueID,
+		Quantity:    order.Quantity,
+		Price:       decimal.NewFromFloat(185.50),
+		Fee:         decimal.NewFromFloat(0.50),
+		FeeAsset:    "USD",
+		Liquidity:   domain.LiquidityTaker,
+		Timestamp:   time.Now(),
+		VenueExecID: "sync-exec-1",
+	}
+	v.fillCh <- fill
+	return &adapter.VenueAck{VenueOrderID: "SYNC-" + string(order.ID), ReceivedAt: time.Now()}, nil
+}
+
+func (v *syncFillVenue) CancelOrder(_ context.Context, _ domain.OrderID, _ string) error {
+	return nil
+}
+func (v *syncFillVenue) QueryOrder(_ context.Context, _ string) (*domain.Order, error) {
+	return nil, fmt.Errorf("not found")
+}
+func (v *syncFillVenue) SubscribeMarketData(_ context.Context, _ []string) (<-chan adapter.MarketDataSnapshot, error) {
+	return make(chan adapter.MarketDataSnapshot), nil
+}
+func (v *syncFillVenue) UnsubscribeMarketData(_ context.Context, _ []string) error { return nil }
+func (v *syncFillVenue) FillFeed() <-chan domain.Fill                               { return v.fillCh }
+func (v *syncFillVenue) Capabilities() adapter.VenueCapabilities {
+	return adapter.VenueCapabilities{}
+}
+
+func makePipelineWith(store *memStore, venue adapter.LiquidityProvider, notifier *mockNotifier) *Pipeline {
+	risk := newMockRiskClient(true)
+	return NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithRouter(makeDefaultRouter()))
 }
 
 // splitStrategy is a test routing strategy that always splits evenly across

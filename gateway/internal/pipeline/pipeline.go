@@ -182,7 +182,9 @@ func (p *Pipeline) Wait() {
 	p.wg.Wait()
 }
 
-// Submit validates the order, assigns a UUID, and pushes it to the intake channel.
+// Submit validates the order, assigns a UUID, persists it to the database,
+// and pushes it to the intake channel. The order is persisted synchronously
+// so that it is available via GET /orders immediately after the REST response.
 func (p *Pipeline) Submit(ctx context.Context, order *domain.Order) error {
 	if order.Quantity.IsZero() || order.Quantity.IsNegative() {
 		return fmt.Errorf("order quantity must be positive")
@@ -196,6 +198,11 @@ func (p *Pipeline) Submit(ctx context.Context, order *domain.Order) error {
 	now := time.Now()
 	order.CreatedAt = now
 	order.UpdatedAt = now
+
+	// Persist the order to the database so it survives page refreshes.
+	if err := p.store.CreateOrder(ctx, order); err != nil {
+		return fmt.Errorf("persisting new order: %w", err)
+	}
 
 	// Track in memory for fill collector lookups
 	p.orderMu.Lock()
@@ -334,8 +341,9 @@ func (p *Pipeline) routeLegacy(ctx context.Context, order *domain.Order) {
 
 	order.VenueID = venueID
 
-	if err := p.store.CreateOrder(ctx, order); err != nil {
-		p.logger.Error("failed to persist new order",
+	// Order was already persisted in Submit(); update with the assigned venue.
+	if err := p.store.UpdateOrder(ctx, order); err != nil {
+		p.logger.Error("failed to update order with venue",
 			slog.String("order_id", string(order.ID)),
 			slog.String("error", err.Error()),
 		)
@@ -370,10 +378,10 @@ func (p *Pipeline) routeSmart(ctx context.Context, order *domain.Order) {
 			order.FilledQuantity = decimal.Zero
 
 			// Process crossing fills.
-			// First, persist the order so fills can be applied (order must be persisted and Acknowledged).
+			// Order was already persisted in Submit(); update with venue assignment.
 			order.VenueID = "INTERNAL"
-			if err := p.store.CreateOrder(ctx, order); err != nil {
-				p.logger.Error("failed to persist order for crossing",
+			if err := p.store.UpdateOrder(ctx, order); err != nil {
+				p.logger.Error("failed to update order for crossing",
 					slog.String("order_id", string(order.ID)),
 					slog.String("error", err.Error()),
 				)
@@ -440,13 +448,13 @@ func (p *Pipeline) routeSmart(ctx context.Context, order *domain.Order) {
 		return
 	}
 
-	// Step 5: Persist the parent order if not already persisted (no crossing happened).
+	// Step 5: Update the parent order with venue assignment (already persisted in Submit).
 	if orderToRoute == order {
 		if len(decision.Allocations) == 1 {
 			order.VenueID = decision.Allocations[0].VenueID
 		}
-		if err := p.store.CreateOrder(ctx, order); err != nil {
-			p.logger.Error("failed to persist new order",
+		if err := p.store.UpdateOrder(ctx, order); err != nil {
+			p.logger.Error("failed to update order with venue",
 				slog.String("order_id", string(order.ID)),
 				slog.String("error", err.Error()),
 			)
@@ -580,8 +588,11 @@ func (p *Pipeline) createChildOrder(parent *domain.Order, alloc router.VenueAllo
 	return child
 }
 
-// venueDispatch calls venue.SubmitOrder, transitions the order to Acknowledged,
-// and persists the update. Each venue has its own goroutine and channel.
+// venueDispatch transitions the order to Acknowledged, then calls
+// venue.SubmitOrder. The transition MUST happen before SubmitOrder because
+// venues (especially the simulated exchange) may generate fills synchronously
+// during SubmitOrder, and the fillCollector will reject fills for orders that
+// are not yet in Acknowledged status.
 func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityProvider) {
 	defer p.wg.Done()
 	ch := p.dispatchCh[venue.VenueID()]
@@ -595,20 +606,8 @@ func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityPro
 			}
 			order := vo.order
 
-			submitStart := time.Now()
-			_, err := venue.SubmitOrder(ctx, order)
-			if err != nil {
-				p.logger.Error("venue rejected order",
-					slog.String("order_id", string(order.ID)),
-					slog.String("venue", venue.VenueID()),
-					slog.String("error", err.Error()),
-				)
-				_ = order.ApplyTransition(domain.OrderStatusRejected)
-				_ = p.store.UpdateOrder(ctx, order)
-				p.notifyOrderUpdate(ctx, order)
-				continue
-			}
-
+			// Transition to Acknowledged BEFORE submitting to venue so that
+			// any fills produced synchronously by the venue can be applied.
 			if err := order.ApplyTransition(domain.OrderStatusAcknowledged); err != nil {
 				p.logger.Error("failed to transition order to acknowledged",
 					slog.String("order_id", string(order.ID)),
@@ -625,6 +624,22 @@ func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityPro
 				continue
 			}
 
+			p.notifyOrderUpdate(ctx, order)
+
+			submitStart := time.Now()
+			_, err := venue.SubmitOrder(ctx, order)
+			if err != nil {
+				p.logger.Error("venue rejected order",
+					slog.String("order_id", string(order.ID)),
+					slog.String("venue", venue.VenueID()),
+					slog.String("error", err.Error()),
+				)
+				_ = order.ApplyTransition(domain.OrderStatusRejected)
+				_ = p.store.UpdateOrder(ctx, order)
+				p.notifyOrderUpdate(ctx, order)
+				continue
+			}
+
 			venueLatency := time.Since(submitStart)
 			metrics.OrdersSubmittedTotal.WithLabelValues(assetClassLabel(order.AssetClass), venue.VenueID()).Inc()
 			metrics.VenueLatencySeconds.WithLabelValues(venue.VenueID()).Observe(venueLatency.Seconds())
@@ -633,7 +648,6 @@ func (p *Pipeline) venueDispatch(ctx context.Context, venue adapter.LiquidityPro
 				slog.String("order_id", string(order.ID)),
 				slog.String("venue", venue.VenueID()),
 			)
-			p.notifyOrderUpdate(ctx, order)
 		}
 	}
 }

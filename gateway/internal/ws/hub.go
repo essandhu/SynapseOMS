@@ -44,6 +44,7 @@ type orderData struct {
 	FilledQuantity string    `json:"filled_quantity"`
 	AveragePrice   string    `json:"average_price"`
 	Status         string    `json:"status"`
+	AssetClass     string    `json:"asset_class,omitempty"`
 	VenueID        string    `json:"venue_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -227,6 +228,7 @@ func (h *Hub) NotifyOrderUpdate(order *domain.Order) {
 			FilledQuantity: order.FilledQuantity.String(),
 			AveragePrice:   order.AveragePrice.String(),
 			Status:         statusStr(order.Status),
+			AssetClass:     assetClassStr(order.AssetClass),
 			VenueID:        order.VenueID,
 			CreatedAt:      order.CreatedAt,
 			UpdatedAt:      order.UpdatedAt,
@@ -380,6 +382,23 @@ func typeStr(t domain.OrderType) string {
 		return "stop_limit"
 	default:
 		return "market"
+	}
+}
+
+func assetClassStr(a domain.AssetClass) string {
+	switch a {
+	case domain.AssetClassEquity:
+		return "equity"
+	case domain.AssetClassCrypto:
+		return "crypto"
+	case domain.AssetClassTokenizedSecurity:
+		return "tokenized_security"
+	case domain.AssetClassFuture:
+		return "future"
+	case domain.AssetClassOption:
+		return "option"
+	default:
+		return "equity"
 	}
 }
 
