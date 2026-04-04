@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -776,6 +777,96 @@ func TestKafkaPublisherReceivesEvents(t *testing.T) {
 	msgs := kafka.getMessages()
 	if msgs[0].instrumentID != "AAPL" {
 		t.Fatalf("expected kafka message for AAPL, got %s", msgs[0].instrumentID)
+	}
+}
+
+func TestKafkaFillEventHasCorrectFormat(t *testing.T) {
+	store := newMemStore()
+	notifier := newMockNotifier()
+	kf := newMockKafkaPublisher()
+
+	venue := &syncFillVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "sim-exchange",
+		status:  adapter.Connected,
+	}
+
+	risk := newMockRiskClient(true)
+	p := NewPipeline(store, []adapter.LiquidityProvider{venue}, notifier, risk,
+		WithKafkaPublisher(kf),
+		WithRouter(makeDefaultRouter()))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// Wait for order to be filled (sync fill venue fills immediately)
+	waitFor(t, 5*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusFilled
+	}, "order to be filled")
+
+	// Wait for Kafka to receive fill event
+	waitFor(t, 2*time.Second, func() bool {
+		msgs := kf.getMessages()
+		for _, m := range msgs {
+			var event map[string]interface{}
+			if err := json.Unmarshal(m.payload, &event); err == nil {
+				if event["type"] == "fill_received" {
+					return true
+				}
+			}
+		}
+		return false
+	}, "kafka to receive fill_received event")
+
+	// Verify fill_received event format matches risk engine expectations
+	msgs := kf.getMessages()
+	var fillEvent map[string]interface{}
+	for _, m := range msgs {
+		var event map[string]interface{}
+		if err := json.Unmarshal(m.payload, &event); err == nil {
+			if event["type"] == "fill_received" {
+				fillEvent = event
+				break
+			}
+		}
+	}
+
+	if fillEvent == nil {
+		t.Fatal("no fill_received event found in Kafka messages")
+	}
+
+	if fillEvent["order_id"] == "" {
+		t.Error("fill_received event missing order_id")
+	}
+
+	fill, ok := fillEvent["fill"].(map[string]interface{})
+	if !ok {
+		t.Fatal("fill_received event missing fill object")
+	}
+
+	if fill["instrument_id"] != "AAPL" {
+		t.Errorf("fill.instrument_id = %v, want AAPL", fill["instrument_id"])
+	}
+	if fill["side"] != "buy" {
+		t.Errorf("fill.side = %v, want buy", fill["side"])
+	}
+	if fill["quantity"] == "" || fill["quantity"] == "0" {
+		t.Errorf("fill.quantity should be non-zero, got %v", fill["quantity"])
+	}
+	if fill["price"] == "" || fill["price"] == "0" {
+		t.Errorf("fill.price should be non-zero, got %v", fill["price"])
+	}
+	if fill["asset_class"] == "" {
+		t.Error("fill.asset_class should not be empty")
+	}
+	if fill["settlement_cycle"] == "" {
+		t.Error("fill.settlement_cycle should not be empty")
 	}
 }
 

@@ -19,6 +19,14 @@ const (
 	SideSell
 )
 
+// String returns "buy" or "sell".
+func (s OrderSide) String() string {
+	if s == SideSell {
+		return "sell"
+	}
+	return "buy"
+}
+
 // OrderType represents the type of order.
 type OrderType int
 

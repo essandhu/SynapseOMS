@@ -13,6 +13,24 @@ const (
 	AssetClassOption
 )
 
+// String returns the lowercase string representation of an AssetClass.
+func (a AssetClass) String() string {
+	switch a {
+	case AssetClassEquity:
+		return "equity"
+	case AssetClassCrypto:
+		return "crypto"
+	case AssetClassTokenizedSecurity:
+		return "tokenized_security"
+	case AssetClassFuture:
+		return "future"
+	case AssetClassOption:
+		return "option"
+	default:
+		return "equity"
+	}
+}
+
 // SettlementCycle represents the settlement period.
 type SettlementCycle int
 

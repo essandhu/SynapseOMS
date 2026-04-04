@@ -14,6 +14,7 @@ import (
 	"github.com/synapse-oms/gateway/internal/crossing"
 	"github.com/synapse-oms/gateway/internal/domain"
 	riskgrpc "github.com/synapse-oms/gateway/internal/grpc"
+	kafkapkg "github.com/synapse-oms/gateway/internal/kafka"
 	"github.com/synapse-oms/gateway/internal/logging"
 	"github.com/synapse-oms/gateway/internal/metrics"
 	"github.com/synapse-oms/gateway/internal/router"
@@ -756,7 +757,7 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 		slog.String("position_qty", pos.Quantity.String()),
 	)
 
-	p.notifyOrderUpdate(ctx, order)
+	p.notifyFillEvent(ctx, order, fill)
 	p.notifier.NotifyPositionUpdate(pos)
 
 	// Clean up fully filled orders from the in-memory map
@@ -768,25 +769,89 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 }
 
 // notifyOrderUpdate sends an order update to both the WebSocket notifier and
-// (optionally) the Kafka producer.
+// (optionally) the Kafka producer. For status-only events (not fills), it
+// publishes a structured OrderLifecycleEvent envelope to Kafka.
 func (p *Pipeline) notifyOrderUpdate(ctx context.Context, order *domain.Order) {
 	p.notifier.NotifyOrderUpdate(order)
 
 	if p.kafka != nil {
-		payload, err := json.Marshal(order)
-		if err != nil {
-			p.logger.Error("failed to marshal order for Kafka",
-				slog.String("order_id", string(order.ID)),
-				slog.String("error", err.Error()),
-			)
+		eventType := orderStatusToEventType(order.Status)
+		if eventType == "" {
 			return
 		}
-		if err := p.kafka.PublishOrderLifecycle(ctx, order.InstrumentID, payload); err != nil {
-			p.logger.Error("failed to publish order lifecycle event",
-				slog.String("order_id", string(order.ID)),
-				slog.String("error", err.Error()),
-			)
+		p.publishOrderEvent(ctx, eventType, order, nil)
+	}
+}
+
+// notifyFillEvent sends an order update and publishes a fill_received event
+// to Kafka with the fill details needed by the risk engine.
+func (p *Pipeline) notifyFillEvent(ctx context.Context, order *domain.Order, fill domain.Fill) {
+	p.notifier.NotifyOrderUpdate(order)
+
+	if p.kafka != nil {
+		p.publishOrderEvent(ctx, kafkapkg.EventFillReceived, order, &fill)
+
+		// If the order is fully filled, also publish a terminal event
+		if order.Status == domain.OrderStatusFilled {
+			p.publishOrderEvent(ctx, kafkapkg.EventOrderFilled, order, nil)
 		}
+	}
+}
+
+// publishOrderEvent marshals and publishes a structured OrderLifecycleEvent.
+func (p *Pipeline) publishOrderEvent(ctx context.Context, eventType string, order *domain.Order, fill *domain.Fill) {
+	event := kafkapkg.OrderLifecycleEvent{
+		Type:    eventType,
+		OrderID: string(order.ID),
+	}
+
+	if fill != nil {
+		event.Fill = &kafkapkg.FillPayload{
+			InstrumentID:    order.InstrumentID,
+			VenueID:         fill.VenueID,
+			Side:            order.Side.String(),
+			Quantity:        fill.Quantity.String(),
+			Price:           fill.Price.String(),
+			Fee:             fill.Fee.String(),
+			AssetClass:      order.AssetClass.String(),
+			SettlementCycle: kafkapkg.SettlementCycleForAssetClass(order.AssetClass.String()),
+			Timestamp:       kafkapkg.FormatTimestamp(fill.Timestamp),
+		}
+	}
+
+	payload, err := json.Marshal(event)
+	if err != nil {
+		p.logger.Error("failed to marshal order lifecycle event",
+			slog.String("order_id", string(order.ID)),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	if err := p.kafka.PublishOrderLifecycle(ctx, order.InstrumentID, payload); err != nil {
+		p.logger.Error("failed to publish order lifecycle event",
+			slog.String("order_id", string(order.ID)),
+			slog.String("type", eventType),
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+// orderStatusToEventType maps an order status to the corresponding Kafka event type.
+func orderStatusToEventType(status domain.OrderStatus) string {
+	switch status {
+	case domain.OrderStatusNew:
+		return kafkapkg.EventOrderCreated
+	case domain.OrderStatusAcknowledged:
+		return kafkapkg.EventOrderAcknowledged
+	case domain.OrderStatusFilled:
+		return kafkapkg.EventOrderFilled
+	case domain.OrderStatusCanceled:
+		return kafkapkg.EventOrderCanceled
+	case domain.OrderStatusRejected:
+		return kafkapkg.EventOrderRejected
+	default:
+		return ""
 	}
 }
 
