@@ -7,7 +7,7 @@ Thanks for your interest in contributing. This document covers how to set up you
 ### Prerequisites
 
 - Docker and Docker Compose
-- Go 1.22+
+- Go 1.25+
 - Python 3.12+
 - Node.js 20+
 

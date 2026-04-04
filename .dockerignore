@@ -1,0 +1,8 @@
+.git
+gateway/gateway
+gateway/gateway.exe
+dashboard/node_modules
+dashboard/dist
+e2e/node_modules
+**/__pycache__
+**/*.pyc

@@ -91,7 +91,7 @@ User enters credentials (Dashboard)
 
 | Layer | Technology |
 |-------|-----------|
-| Gateway | Go 1.25, Chi router, slog, shopspring/decimal |
+| Gateway | Go 1.25, Chi router, slog, shopspring/decimal, segmentio/kafka-go |
 | Risk Engine | Python 3.12+, FastAPI, NumPy, SciPy, cvxpy, scikit-learn |
 | Dashboard | TypeScript, React 19, Vite 6, Zustand 5, AG Grid, Recharts, Tailwind CSS 4 |
 | Messaging | Apache Kafka 3.7 (KRaft mode) |
@@ -106,7 +106,9 @@ User enters credentials (Dashboard)
 - **Self-hosted**: All data stays on the user's machine. Credentials are encrypted at rest with a user-chosen passphrase.
 - **Adapter pattern**: New exchanges are added by implementing one Go interface (14 methods). See [Write a Venue Adapter](write-adapter.md).
 - **Fail-open risk**: If the risk engine is unavailable, orders proceed with a warning log rather than blocking all trading.
-- **Event sourcing via Kafka**: Order lifecycle events flow through Kafka, enabling the risk engine to maintain an independent portfolio view.
+- **Event sourcing via Kafka**: Order lifecycle events flow through Kafka, enabling the risk engine to maintain an independent portfolio view. The gateway publishes structured JSON event envelopes (`order_created`, `fill_received`, `order_filled`, etc.) to the `order-lifecycle` topic. The risk engine consumes these to update portfolio cash, positions, and NAV.
+- **Pure Go Kafka client**: The gateway uses `segmentio/kafka-go` (pure Go, no CGO/librdkafka dependency) for cross-platform builds without a C toolchain.
+- **NAV = available cash + positions market value**: Net Asset Value is computed from `available_cash` (cash minus all committed purchases) plus the current market value of all positions. This avoids double-counting unsettled T+2 equity purchases where `cash` hasn't been debited yet but the position already exists.
 - **Mixed-calendar support**: VaR computation handles the calendar mismatch between equities (business days) and crypto (24/7).
 
 ## Contribution Entry Points
