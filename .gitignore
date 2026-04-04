@@ -62,9 +62,4 @@ secrets/
 certs/
 
 # Internal dev docs
-docs/phase-*-tasks.md
-docs/phase-*-review.md
-docs/planning-prompt.md
-docs/deliverables-checklist.md
-docs/final-audit.md
-docs/architecture.md
+docs/internal/
