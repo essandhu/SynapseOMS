@@ -1,15 +1,28 @@
 import { useState, useCallback, useMemo } from "react";
-import type { Instrument, OrderSide, OrderType, SubmitOrderRequest, Venue } from "../api/types";
+import type { AssetClass, Instrument, OrderSide, OrderType, Position, SubmitOrderRequest, Venue } from "../api/types";
 
 const SMART_ROUTE_ID = "smart";
 
 export interface OrderTicketProps {
   instruments: Instrument[];
   venues?: Venue[];
+  positions?: Position[];
   onSubmit: (request: SubmitOrderRequest) => Promise<void>;
 }
 
-export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketProps) {
+/** Check whether a venue supports the given asset class. */
+function venueSupportsAsset(venue: Venue, assetClass: AssetClass): boolean {
+  return venue.supportedAssets.includes(assetClass);
+}
+
+/** Sum net position quantity across all venues for a given instrument. */
+function netPositionForInstrument(positions: Position[], instrumentId: string): number {
+  return positions
+    .filter((p) => p.instrumentId === instrumentId)
+    .reduce((sum, p) => sum + Number(p.quantity), 0);
+}
+
+export function OrderTicket({ instruments, venues = [], positions = [], onSubmit }: OrderTicketProps) {
   const [instrumentId, setInstrumentId] = useState("");
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("market");
@@ -31,13 +44,62 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
     );
   }, [instruments, search]);
 
+  const selectedInstrument = useMemo(
+    () => instruments.find((i) => i.id === instrumentId),
+    [instruments, instrumentId],
+  );
+
+  // Only show connected venues; additionally filter by asset class when an instrument is selected.
+  const availableVenues = useMemo(() => {
+    return venues.filter((v) => {
+      if (v.status !== "connected") return false;
+      if (selectedInstrument && !venueSupportsAsset(v, selectedInstrument.assetClass)) return false;
+      return true;
+    });
+  }, [venues, selectedInstrument]);
+
+  // Reset venue to smart route when the available venue list changes and the
+  // currently selected venue is no longer valid.
+  const effectiveVenueId = useMemo(() => {
+    if (venueId === SMART_ROUTE_ID) return SMART_ROUTE_ID;
+    if (availableVenues.some((v) => v.id === venueId)) return venueId;
+    return SMART_ROUTE_ID;
+  }, [venueId, availableVenues]);
+
+  const hasConnectedVenues = availableVenues.length > 0;
+
   const validate = useCallback((): string | null => {
     if (!instrumentId) return "Instrument is required";
     if (!quantity || Number(quantity) <= 0) return "Quantity is required";
     if (orderType === "limit" && (!price || Number(price) <= 0))
       return "Price is required for limit orders";
+
+    // Sell-side validation: ensure the user holds enough shares
+    if (side === "sell") {
+      const netQty = netPositionForInstrument(positions, instrumentId);
+      if (netQty <= 0) {
+        return "No position held — cannot sell an instrument you do not own";
+      }
+      if (Number(quantity) > netQty) {
+        return `Sell quantity exceeds held position (${netQty} available)`;
+      }
+    }
+
+    // Venue connectivity check (for explicit venue selection)
+    if (effectiveVenueId !== SMART_ROUTE_ID) {
+      const venue = venues.find((v) => v.id === effectiveVenueId);
+      if (venue && venue.status !== "connected") {
+        return `Venue "${venue.name}" is not connected`;
+      }
+    }
+
+    // At least one compatible venue must be connected for smart routing
+    if (effectiveVenueId === SMART_ROUTE_ID && !hasConnectedVenues) {
+      return "No connected venues available — connect a venue before trading";
+    }
+
     return null;
-  }, [instrumentId, quantity, price, orderType]);
+  }, [instrumentId, quantity, price, orderType, side, positions, effectiveVenueId, venues, hasConnectedVenues]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -56,7 +118,7 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
         side,
         type: orderType,
         quantity,
-        venueId: venueId === SMART_ROUTE_ID ? SMART_ROUTE_ID : venueId,
+        venueId: effectiveVenueId === SMART_ROUTE_ID ? SMART_ROUTE_ID : effectiveVenueId,
         ...(orderType === "limit" ? { price } : {}),
       };
 
@@ -74,7 +136,7 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
         setSubmitting(false);
       }
     },
-    [instrumentId, side, orderType, quantity, price, venueId, onSubmit, validate],
+    [instrumentId, side, orderType, quantity, price, effectiveVenueId, onSubmit, validate],
   );
 
   return (
@@ -119,7 +181,7 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
         </select>
       </div>
 
-      {/* Venue selector */}
+      {/* Venue selector — only connected, asset-compatible venues */}
       <div className="flex flex-col gap-1">
         <label
           htmlFor="venue-select"
@@ -131,18 +193,23 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
           <select
             id="venue-select"
             aria-label="Venue"
-            value={venueId}
+            value={effectiveVenueId}
             onChange={(e) => setVenueId(e.target.value)}
             className="w-full rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary focus:border-accent-blue focus:outline-none"
           >
             <option value={SMART_ROUTE_ID}>⚡ Smart Route</option>
-            {venues.map((v) => (
+            {availableVenues.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name}
               </option>
             ))}
           </select>
-          {venueId === SMART_ROUTE_ID && (
+          {!hasConnectedVenues && (
+            <p className="mt-1 font-mono text-xs text-accent-yellow">
+              No connected venues{selectedInstrument?.assetClass ? ` for ${selectedInstrument.assetClass}` : ""}
+            </p>
+          )}
+          {effectiveVenueId === SMART_ROUTE_ID && hasConnectedVenues && (
             <div className="relative mt-1">
               <button
                 type="button"
@@ -199,6 +266,13 @@ export function OrderTicket({ instruments, venues = [], onSubmit }: OrderTicketP
           </button>
         </div>
       </div>
+
+      {/* Sell-side position info */}
+      {side === "sell" && instrumentId && (
+        <div className="rounded border border-border/50 bg-bg-primary/50 px-2 py-1 font-mono text-xs text-text-muted">
+          Held: {netPositionForInstrument(positions, instrumentId)} shares
+        </div>
+      )}
 
       {/* Order type selector */}
       <div className="flex flex-col gap-1">

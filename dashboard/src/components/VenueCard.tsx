@@ -158,19 +158,15 @@ function LatencySparkline({
 
 /** Mock drill-down stats for a venue (placeholder until backend endpoint exists) */
 function useMockDrillDownStats(venue: Venue) {
-  // Derive mock stats from the venue's existing metrics
+  const fillRate = venue.fillRate ?? 0;
+  const latencyP50 = venue.latencyP50Ms ?? 0;
+  const orderCount = Math.floor(fillRate * 1000 + latencyP50 * 2);
   return {
-    orderCount: Math.floor(venue.fillRate * 1000 + venue.latencyP50Ms * 2),
-    fillCount: Math.floor(
-      venue.fillRate * (venue.fillRate * 1000 + venue.latencyP50Ms * 2),
-    ),
-    rejectCount: Math.floor(
-      (1 - venue.fillRate) *
-        (venue.fillRate * 1000 + venue.latencyP50Ms * 2) *
-        0.3,
-    ),
-    avgFillTimeMs: Math.round(venue.latencyP50Ms * 1.2),
-    partialFillRate: Math.max(0, venue.fillRate - 0.05),
+    orderCount,
+    fillCount: Math.floor(fillRate * orderCount),
+    rejectCount: Math.floor((1 - fillRate) * orderCount * 0.3),
+    avgFillTimeMs: Math.round(latencyP50 * 1.2),
+    partialFillRate: Math.max(0, fillRate - 0.05),
   };
 }
 
@@ -324,8 +320,8 @@ export function VenueCard({
       {/* Fill rate */}
       <div className="font-mono text-xs text-text-muted">
         <span className="text-text-secondary">Fill Rate:</span>{" "}
-        <span className={fillRateColor(venue.fillRate)} data-testid="fill-rate">
-          {(venue.fillRate * 100).toFixed(1)}%
+        <span className={fillRateColor(venue.fillRate ?? 0)} data-testid="fill-rate">
+          {((venue.fillRate ?? 0) * 100).toFixed(1)}%
         </span>
       </div>
 
