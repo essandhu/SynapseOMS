@@ -10,6 +10,7 @@ Every adapter must implement the `LiquidityProvider` interface defined in `gatew
 type LiquidityProvider interface {
     VenueID() string
     VenueName() string
+    VenueType() string
     SupportedAssetClasses() []domain.AssetClass
     SupportedInstruments() ([]domain.Instrument, error)
     Connect(ctx context.Context, cred domain.VenueCredential) error
@@ -74,8 +75,9 @@ func NewAdapter(config map[string]string) adapter.LiquidityProvider {
     }
 }
 
-func (a *Adapter) VenueID() string  { return venueID }
+func (a *Adapter) VenueID() string   { return venueID }
 func (a *Adapter) VenueName() string { return venueName }
+func (a *Adapter) VenueType() string { return "exchange" } // "exchange", "dark_pool", "simulated", etc.
 
 func (a *Adapter) SupportedAssetClasses() []domain.AssetClass {
     return []domain.AssetClass{domain.AssetClassCrypto}
@@ -207,6 +209,7 @@ The contract suite validates 7 baseline behaviors:
 |------|----------------|
 | VenueID returns non-empty string | Adapter has a venue identifier |
 | VenueName returns non-empty string | Adapter has a display name |
+| VenueType returns non-empty string | Adapter declares its type (e.g. "exchange", "simulated") |
 | Status returns Disconnected before Connect | Correct initial state |
 | SupportedInstruments returns at least one | Adapter declares tradeable instruments |
 | SupportedAssetClasses returns at least one | Adapter declares asset classes |

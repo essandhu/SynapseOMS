@@ -194,6 +194,94 @@ func TestSubmitOrder_Success(t *testing.T) {
 	}
 }
 
+func TestSubmitOrder_AutoGeneratesClientOrderID(t *testing.T) {
+	venueID := "test-order-venue-auto-coid"
+	mlp := &mockLiquidityProvider{
+		venueID:      venueID,
+		venueName:    "Auto COID Exchange",
+		status:       adapter.Connected,
+		assetClasses: []domain.AssetClass{domain.AssetClassEquity},
+	}
+	adapter.RegisterInstance(venueID, mlp)
+
+	ms := &mockStore{
+		instruments: []domain.Instrument{
+			{ID: "AAPL", Symbol: "AAPL", Name: "Apple Inc", AssetClass: domain.AssetClassEquity},
+		},
+	}
+	mp := &mockPipeline{}
+	router := setupRouter(ms, mp)
+
+	// Submit without client_order_id — should auto-generate
+	body := `{"instrument_id":"AAPL","side":"buy","type":"market","quantity":"10","price":"0"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp1 map[string]interface{}
+	decodeJSON(t, rec.Result(), &resp1)
+	coid1, ok := resp1["client_order_id"].(string)
+	if !ok || coid1 == "" {
+		t.Fatalf("expected non-empty auto-generated client_order_id, got %v", resp1["client_order_id"])
+	}
+	if len(coid1) < 5 {
+		t.Errorf("auto-generated client_order_id too short: %q", coid1)
+	}
+
+	// Submit a second order — should get a different client_order_id
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString(body))
+	req2.Header.Set("Content-Type", "application/json")
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+
+	var resp2 map[string]interface{}
+	decodeJSON(t, rec2.Result(), &resp2)
+	coid2 := resp2["client_order_id"].(string)
+	if coid1 == coid2 {
+		t.Errorf("two orders got the same auto-generated client_order_id: %q", coid1)
+	}
+}
+
+func TestSubmitOrder_UsesProvidedClientOrderID(t *testing.T) {
+	venueID := "test-order-venue-prov-coid"
+	mlp := &mockLiquidityProvider{
+		venueID:      venueID,
+		venueName:    "Provided COID Exchange",
+		status:       adapter.Connected,
+		assetClasses: []domain.AssetClass{domain.AssetClassEquity},
+	}
+	adapter.RegisterInstance(venueID, mlp)
+
+	ms := &mockStore{
+		instruments: []domain.Instrument{
+			{ID: "AAPL", Symbol: "AAPL", Name: "Apple Inc", AssetClass: domain.AssetClassEquity},
+		},
+	}
+	mp := &mockPipeline{}
+	router := setupRouter(ms, mp)
+
+	body := `{"instrument_id":"AAPL","side":"buy","type":"market","quantity":"10","price":"0","client_order_id":"my-custom-id"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	decodeJSON(t, rec.Result(), &resp)
+	if resp["client_order_id"] != "my-custom-id" {
+		t.Errorf("expected provided client_order_id 'my-custom-id', got %v", resp["client_order_id"])
+	}
+}
+
 func TestSubmitOrder_PopulatesAssetClassFromInstrument(t *testing.T) {
 	venueID := "test-order-venue-crypto"
 	mlp := &mockLiquidityProvider{

@@ -62,11 +62,13 @@ Trading terminal UI with real-time data.
 ```
 User submits order (Dashboard)
     → REST POST /api/v1/orders (Gateway)
+    → Order persisted to PostgreSQL (status: New)
     → Pipeline intake channel
     → gRPC pre-trade risk check (Risk Engine) [< 10ms]
-    → Smart Router selects venue
+    → Smart Router selects venue, updates order with venue ID
+    → Order transitioned to Acknowledged (before venue submission)
     → Venue adapter submits to exchange
-    → Fill received from exchange
+    → Fill received from exchange (may arrive synchronously)
     → Fill persisted to PostgreSQL
     → Fill published to Kafka (order-lifecycle topic)
     → Risk Engine consumes fill, updates portfolio state
