@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { OrderTicket } from "./OrderTicket";
-import type { Instrument, Venue } from "../api/types";
+import type { Instrument, Position, Venue } from "../api/types";
 
 const mockInstruments: Instrument[] = [
   {
@@ -51,10 +51,26 @@ const mockVenues: Venue[] = [
   },
 ];
 
+/** Positions for sell-side tests */
+const mockPositions: Position[] = [
+  {
+    instrumentId: "btc-usd",
+    venueId: "sim-exchange",
+    quantity: "50",
+    averageCost: "60000",
+    marketPrice: "62000",
+    unrealizedPnl: "100000",
+    realizedPnl: "0",
+    unsettledQuantity: "0",
+    assetClass: "crypto",
+    quoteCurrency: "USD",
+  },
+];
+
 describe("OrderTicket", () => {
   it("submits market order with correct parameters", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} />);
+    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} venues={mockVenues} />);
 
     // Select instrument
     fireEvent.change(screen.getByLabelText("Instrument"), {
@@ -139,7 +155,14 @@ describe("OrderTicket", () => {
 
   it("Buy/Sell toggle changes side", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} />);
+    render(
+      <OrderTicket
+        onSubmit={onSubmit}
+        instruments={mockInstruments}
+        venues={mockVenues}
+        positions={mockPositions}
+      />,
+    );
 
     // Select instrument and quantity
     fireEvent.change(screen.getByLabelText("Instrument"), {
@@ -162,7 +185,7 @@ describe("OrderTicket", () => {
 
   it("clears form after successful submission", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} />);
+    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} venues={mockVenues} />);
 
     fireEvent.change(screen.getByLabelText("Instrument"), {
       target: { value: "btc-usd" },
@@ -186,7 +209,7 @@ describe("OrderTicket", () => {
     const onSubmit = vi.fn(
       () => new Promise<void>((resolve) => { resolveSubmit = resolve; }),
     );
-    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} />);
+    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} venues={mockVenues} />);
 
     fireEvent.change(screen.getByLabelText("Instrument"), {
       target: { value: "btc-usd" },
@@ -210,7 +233,7 @@ describe("OrderTicket", () => {
 
   it("submits limit order with price", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} />);
+    render(<OrderTicket onSubmit={onSubmit} instruments={mockInstruments} venues={mockVenues} />);
 
     fireEvent.change(screen.getByLabelText("Instrument"), {
       target: { value: "eth-usd" },
@@ -363,7 +386,10 @@ describe("OrderTicket", () => {
     // Info button visible with Smart Route
     expect(screen.getByLabelText("Smart Route info")).toBeInTheDocument();
 
-    // Switch to specific venue
+    // Switch to specific venue — need an instrument selected for venue filtering
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
     fireEvent.change(screen.getByLabelText("Venue"), {
       target: { value: "sim-exchange" },
     });
@@ -372,23 +398,56 @@ describe("OrderTicket", () => {
     expect(screen.queryByLabelText("Smart Route info")).not.toBeInTheDocument();
   });
 
-  it("lists all venues in the dropdown", () => {
+  it("only lists connected venues that support the instrument's asset class", () => {
+    const disconnectedVenue: Venue = {
+      id: "offline-venue",
+      name: "Offline Venue",
+      type: "exchange",
+      status: "disconnected",
+      supportedAssets: ["crypto"],
+      latencyP50Ms: 0,
+      latencyP99Ms: 0,
+      fillRate: 0,
+      lastHeartbeat: "",
+      hasCredentials: true,
+    };
+    const equityOnlyVenue: Venue = {
+      id: "equity-venue",
+      name: "Equity Only",
+      type: "exchange",
+      status: "connected",
+      supportedAssets: ["equity"],
+      latencyP50Ms: 5,
+      latencyP99Ms: 10,
+      fillRate: 0.99,
+      lastHeartbeat: "2026-04-02T00:00:00Z",
+      hasCredentials: true,
+    };
+
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <OrderTicket
         onSubmit={onSubmit}
         instruments={mockInstruments}
-        venues={mockVenues}
+        venues={[...mockVenues, disconnectedVenue, equityOnlyVenue]}
       />,
     );
 
-    const venueSelect = screen.getByLabelText("Venue") as HTMLSelectElement;
-    const options = venueSelect.querySelectorAll("option");
+    // Select a crypto instrument — equity-only and disconnected venues should be filtered out
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
 
-    // Smart Route + 2 venues = 3 options
-    expect(options).toHaveLength(3);
-    expect(options[1].textContent).toBe("Simulated Exchange");
-    expect(options[2].textContent).toBe("Dark Pool Alpha");
+    const venueSelect = screen.getByLabelText("Venue") as HTMLSelectElement;
+    const options = Array.from(venueSelect.querySelectorAll("option"));
+    const optionValues = options.map((o) => o.value);
+
+    // Smart Route + 2 crypto-compatible connected venues
+    expect(optionValues).toContain("smart");
+    expect(optionValues).toContain("sim-exchange");
+    expect(optionValues).toContain("dark-pool-1");
+    expect(optionValues).not.toContain("offline-venue");
+    expect(optionValues).not.toContain("equity-venue");
   });
 
   it("renders venue selector even without venues prop", () => {
@@ -401,5 +460,108 @@ describe("OrderTicket", () => {
     // Only Smart Route option when no venues provided
     const options = venueSelect.querySelectorAll("option");
     expect(options).toHaveLength(1);
+  });
+
+  // --- Sell-side validation ---
+
+  it("prevents selling when no position is held", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OrderTicket
+        onSubmit={onSubmit}
+        instruments={mockInstruments}
+        venues={mockVenues}
+        positions={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
+    fireEvent.change(screen.getByLabelText("Quantity"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByText("Sell"));
+    fireEvent.click(screen.getByText("Submit Order"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No position held — cannot sell an instrument you do not own"),
+      ).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("prevents selling more than held position", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OrderTicket
+        onSubmit={onSubmit}
+        instruments={mockInstruments}
+        venues={mockVenues}
+        positions={mockPositions}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
+    fireEvent.change(screen.getByLabelText("Quantity"), {
+      target: { value: "999" },
+    });
+    fireEvent.click(screen.getByText("Sell"));
+    fireEvent.click(screen.getByText("Submit Order"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Sell quantity exceeds held position (50 available)"),
+      ).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("shows held position quantity when sell is selected", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OrderTicket
+        onSubmit={onSubmit}
+        instruments={mockInstruments}
+        venues={mockVenues}
+        positions={mockPositions}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
+    fireEvent.click(screen.getByText("Sell"));
+
+    expect(screen.getByText("Held: 50 shares")).toBeInTheDocument();
+  });
+
+  it("blocks submission when no connected venues are available", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OrderTicket
+        onSubmit={onSubmit}
+        instruments={mockInstruments}
+        venues={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "btc-usd" },
+    });
+    fireEvent.change(screen.getByLabelText("Quantity"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByText("Submit Order"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No connected venues available — connect a venue before trading"),
+      ).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

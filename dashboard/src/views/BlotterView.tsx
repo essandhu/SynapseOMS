@@ -4,6 +4,7 @@ import { OrderTicket } from "../components/OrderTicket";
 import { CandlestickChart } from "../components/CandlestickChart";
 import { useOrderStore } from "../stores/orderStore";
 import { useVenueStore } from "../stores/venueStore";
+import { usePositionStore } from "../stores/positionStore";
 import { useMarketDataStore } from "../stores/marketDataStore";
 import { fetchInstruments } from "../api/rest";
 import type { Instrument, OrderStatus } from "../api/types";
@@ -30,6 +31,10 @@ export function BlotterView() {
   const venueMap = useVenueStore((s) => s.venues);
   const loadVenues = useVenueStore((s) => s.loadVenues);
   const venues = useMemo(() => Array.from(venueMap.values()), [venueMap]);
+
+  const positionMap = usePositionStore((s) => s.positions);
+  const loadPositions = usePositionStore((s) => s.loadPositions);
+  const positions = useMemo(() => Array.from(positionMap.values()), [positionMap]);
 
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("active");
@@ -62,7 +67,10 @@ export function BlotterView() {
     loadVenues().catch(() => {
       /* venues will be empty */
     });
-  }, [loadVenues]);
+    loadPositions().catch(() => {
+      /* positions will be empty */
+    });
+  }, [loadVenues, loadPositions]);
 
   // Filter orders based on current tab
   const filteredOrders = useMemo(() => {
@@ -195,7 +203,7 @@ export function BlotterView() {
       {/* Order ticket sidebar */}
       {ticketOpen && (
         <div className="w-[360px] shrink-0">
-          <OrderTicket instruments={instruments} venues={venues} onSubmit={submitOrder} />
+          <OrderTicket instruments={instruments} venues={venues} positions={positions} onSubmit={submitOrder} />
         </div>
       )}
     </div>
