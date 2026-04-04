@@ -25,10 +25,10 @@ services:
     build: ../dashboard
     ports: ["3000:3000"]
     restart: unless-stopped
-    environment:
-      - VITE_API_URL=http://localhost:8080
-      - VITE_WS_URL=ws://localhost:8080
-      - VITE_RISK_API_URL=http://localhost:8081
+    # NOTE: VITE_ env vars have no effect at runtime — the dashboard is a
+    # static build.  API routing is handled by nginx proxy rules baked into
+    # the Dockerfile (/api/v1/ → gateway, /risk-api/ → risk-engine).
+    environment: []
     depends_on:
       gateway: { condition: service_healthy }
 

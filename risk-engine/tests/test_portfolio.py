@@ -118,3 +118,106 @@ class TestNavComputation:
         # positions: BTC(6000) + AAPL(10000) = 16000
         # NAV: 84000 + 16000 = 100000
         assert p.nav == Decimal("100000")
+
+
+class TestT2SellCashHandling:
+    """T2 sell must restore available_cash so NAV stays accurate."""
+
+    def test_t2_sell_restores_available_cash(self) -> None:
+        """After a T2 buy + sell round-trip at same price, NAV returns to initial cash."""
+        p = Portfolio(
+            cash=Decimal("100000"),
+            available_cash=Decimal("100000"),
+        )
+        # T2 equity buy: 50 AAPL @ $200 = $10,000
+        p.apply_fill(
+            instrument_id="AAPL",
+            venue_id="alpaca",
+            side="buy",
+            quantity=Decimal("50"),
+            price=Decimal("200"),
+            asset_class="equity",
+            settlement_cycle="T2",
+        )
+        assert p.available_cash == Decimal("90000")
+        assert p.nav == Decimal("100000")
+
+        # T2 equity sell: 50 AAPL @ $200 = $10,000
+        p.apply_fill(
+            instrument_id="AAPL",
+            venue_id="alpaca",
+            side="sell",
+            quantity=Decimal("50"),
+            price=Decimal("200"),
+            asset_class="equity",
+            settlement_cycle="T2",
+        )
+        # Position is flat — no market value
+        # available_cash must return to 100000
+        # NAV: 100000 + 0 = 100000
+        assert p.available_cash == Decimal("100000")
+        assert p.nav == Decimal("100000")
+
+    def test_t2_sell_at_profit_increases_nav(self) -> None:
+        """T2 buy then sell at higher price increases NAV by the profit."""
+        p = Portfolio(
+            cash=Decimal("100000"),
+            available_cash=Decimal("100000"),
+        )
+        # Buy 100 AAPL @ $150
+        p.apply_fill(
+            instrument_id="AAPL",
+            venue_id="alpaca",
+            side="buy",
+            quantity=Decimal("100"),
+            price=Decimal("150"),
+            asset_class="equity",
+            settlement_cycle="T2",
+        )
+        # available_cash: 100000 - 15000 = 85000
+        assert p.available_cash == Decimal("85000")
+
+        # Sell 100 AAPL @ $160 (profit of $10/share)
+        p.apply_fill(
+            instrument_id="AAPL",
+            venue_id="alpaca",
+            side="sell",
+            quantity=Decimal("100"),
+            price=Decimal("160"),
+            asset_class="equity",
+            settlement_cycle="T2",
+        )
+        # Sell proceeds: 100 * 160 = 16000
+        # available_cash: 85000 + 16000 = 101000
+        # Position flat, NAV = 101000
+        assert p.available_cash == Decimal("101000")
+        assert p.nav == Decimal("101000")
+
+    def test_t0_sell_round_trip_nav(self) -> None:
+        """T0 round-trip at same price returns NAV to initial cash."""
+        p = Portfolio(
+            cash=Decimal("100000"),
+            available_cash=Decimal("100000"),
+        )
+        p.apply_fill(
+            instrument_id="BTC-USD",
+            venue_id="binance",
+            side="buy",
+            quantity=Decimal("1"),
+            price=Decimal("50000"),
+            asset_class="crypto",
+            settlement_cycle="T0",
+        )
+        assert p.available_cash == Decimal("50000")
+
+        p.apply_fill(
+            instrument_id="BTC-USD",
+            venue_id="binance",
+            side="sell",
+            quantity=Decimal("1"),
+            price=Decimal("50000"),
+            asset_class="crypto",
+            settlement_cycle="T0",
+        )
+        assert p.available_cash == Decimal("100000")
+        assert p.nav == Decimal("100000")

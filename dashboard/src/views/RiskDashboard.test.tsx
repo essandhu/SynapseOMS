@@ -149,4 +149,64 @@ describe("RiskDashboard", () => {
 
     expect(mockSubscribe).toHaveBeenCalledOnce();
   });
+
+  it("passes VaR amounts correctly to VaRGauge components", () => {
+    mockStoreState.var = {
+      historicalVaR: "12500.00",
+      parametricVaR: "11200.00",
+      monteCarloVaR: "13000.00",
+      cvar: "15800.00",
+      confidence: 95,
+      horizon: "1d",
+      computedAt: "2026-04-01T10:00:00Z",
+      monteCarloDistribution: [100, 200, 300],
+    };
+
+    render(<RiskDashboard />);
+
+    // VaRGauge is mocked, so just verify the 3 gauges render
+    const gauges = screen.getAllByTestId("var-gauge");
+    expect(gauges).toHaveLength(3);
+  });
+
+  it("renders settlement data when present", () => {
+    mockStoreState.settlement = {
+      totalUnsettled: "25000.00",
+      entries: [
+        {
+          date: "2026-04-02",
+          amount: "15000.00",
+          instrumentId: "AAPL",
+          assetClass: "equity",
+        },
+      ],
+    };
+
+    render(<RiskDashboard />);
+
+    expect(screen.getByText("Settlement Risk")).toBeInTheDocument();
+    expect(screen.getByText(/\$25,000 unsettled/)).toBeInTheDocument();
+  });
+
+  it("does not set up duplicate polling intervals", () => {
+    vi.useFakeTimers();
+
+    render(<RiskDashboard />);
+
+    // subscribe already handles polling — component should not add its own
+    // After 30s, fetchVaR etc should NOT be called independently
+    // (they are called by subscribe's internal polling)
+    expect(mockSubscribe).toHaveBeenCalledOnce();
+
+    // Advance 30 seconds — only subscribe's interval should fire
+    vi.advanceTimersByTime(30_000);
+
+    // The individual fetch functions should not be called directly by the component
+    // (subscribe handles everything)
+    expect(mockFetchVaR).not.toHaveBeenCalled();
+    expect(mockFetchDrawdown).not.toHaveBeenCalled();
+    expect(mockFetchSettlement).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
 });

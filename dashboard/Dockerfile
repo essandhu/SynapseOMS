@@ -26,6 +26,12 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
+    location /risk-api/ {
+        proxy_pass http://risk-engine:8081/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
     location /ws/ {
         proxy_pass http://gateway:8080;
         proxy_http_version 1.1;

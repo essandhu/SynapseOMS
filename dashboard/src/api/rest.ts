@@ -60,7 +60,7 @@ const api = ky.create({
 });
 
 const riskApi = ky.create({
-  prefixUrl: import.meta.env.VITE_RISK_API_URL || "http://localhost:8081",
+  prefixUrl: import.meta.env.VITE_RISK_API_URL || "/risk-api",
   timeout: 10_000,
   retry: {
     limit: 3,

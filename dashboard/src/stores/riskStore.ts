@@ -59,6 +59,24 @@ export interface RiskStoreState {
   subscribe: () => () => void;
 }
 
+/** Tracks in-flight fetches so loading goes false only when all complete. */
+export let pendingCount = 0;
+
+/** Reset pending counter (for tests only). */
+export function resetPendingCount(): void {
+  pendingCount = 0;
+}
+
+function startFetch(set: (partial: Partial<RiskStoreState>) => void): void {
+  if (pendingCount === 0) set({ loading: true, error: null });
+  pendingCount++;
+}
+
+function endFetch(set: (partial: Partial<RiskStoreState>) => void): void {
+  pendingCount = Math.max(0, pendingCount - 1);
+  if (pendingCount === 0) set({ loading: false });
+}
+
 export const useRiskStore = create<RiskStoreState>()((set, get) => ({
   var: null,
   drawdown: null,
@@ -69,58 +87,70 @@ export const useRiskStore = create<RiskStoreState>()((set, get) => ({
   error: null,
 
   fetchVaR: async (): Promise<void> => {
-    set({ loading: true, error: null });
+    startFetch(set);
     try {
       const data = await apiFetchVaR();
-      set({ var: data, loading: false });
+      set({ var: data });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to fetch VaR metrics";
-      set({ loading: false, error: message });
+      set((s) => ({ error: s.error ?? message }));
+    } finally {
+      endFetch(set);
     }
   },
 
   fetchDrawdown: async (): Promise<void> => {
-    set({ loading: true, error: null });
+    startFetch(set);
     try {
       const data = await apiFetchDrawdown();
-      set({ drawdown: data, loading: false });
+      set({ drawdown: data });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to fetch drawdown data";
-      set({ loading: false, error: message });
+      set((s) => ({ error: s.error ?? message }));
+    } finally {
+      endFetch(set);
     }
   },
 
   fetchSettlement: async (): Promise<void> => {
-    set({ loading: true, error: null });
+    startFetch(set);
     try {
       const data = await apiFetchSettlement();
-      set({ settlement: data, loading: false });
+      set({ settlement: data });
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
           : "Failed to fetch settlement timeline";
-      set({ loading: false, error: message });
+      set((s) => ({ error: s.error ?? message }));
+    } finally {
+      endFetch(set);
     }
   },
 
   fetchGreeks: async (): Promise<void> => {
+    startFetch(set);
     try {
       const data = await apiFetchGreeks();
       set({ greeks: data });
     } catch {
       // Greeks are supplementary — don't overwrite primary error state
+    } finally {
+      endFetch(set);
     }
   },
 
   fetchConcentration: async (): Promise<void> => {
+    startFetch(set);
     try {
       const data = await apiFetchConcentration();
       set({ concentration: data });
     } catch {
       // Concentration is supplementary — don't overwrite primary error state
+    } finally {
+      endFetch(set);
     }
   },
 

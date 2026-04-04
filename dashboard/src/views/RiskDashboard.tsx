@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -15,8 +15,6 @@ import { MonteCarloPlot } from "../components/MonteCarloPlot";
 import { GreeksHeatmap } from "../components/GreeksHeatmap";
 import { ConcentrationTreemap } from "../components/ConcentrationTreemap";
 import type { SettlementTimeline } from "../api/types";
-
-const POLL_INTERVAL_MS = 30_000;
 
 function formatCurrency(amount: string): string {
   const num = parseFloat(amount);
@@ -213,33 +211,12 @@ export function RiskDashboard() {
   const loading = useRiskStore((s) => s.loading);
   const error = useRiskStore((s) => s.error);
   const subscribe = useRiskStore((s) => s.subscribe);
-  const fetchVaR = useRiskStore((s) => s.fetchVaR);
-  const fetchDrawdown = useRiskStore((s) => s.fetchDrawdown);
-  const fetchSettlement = useRiskStore((s) => s.fetchSettlement);
-  const fetchGreeks = useRiskStore((s) => s.fetchGreeks);
-  const fetchConcentration = useRiskStore((s) => s.fetchConcentration);
 
-  // Subscribe to WebSocket on mount
+  // Subscribe on mount — handles initial fetch + 30s polling
   useEffect(() => {
     const unsubscribe = subscribe();
     return unsubscribe;
   }, [subscribe]);
-
-  // Poll every 30s for fresh data
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      fetchVaR();
-      fetchDrawdown();
-      fetchSettlement();
-      fetchGreeks();
-      fetchConcentration();
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [fetchVaR, fetchDrawdown, fetchSettlement, fetchGreeks, fetchConcentration]);
 
   // Parse Monte Carlo values from VaR response
   const mcVarAmount =

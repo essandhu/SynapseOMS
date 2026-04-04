@@ -127,6 +127,9 @@ class Portfolio:
                     self.cash += fill_cost
                     self.available_cash += fill_cost
                 else:
+                    # T2: sell proceeds increase available_cash (mirrors the
+                    # buy deduction) and settle against unsettled_cash.
+                    self.available_cash += fill_cost
                     self.unsettled_cash -= fill_cost
                     self.cash += fill_cost
 

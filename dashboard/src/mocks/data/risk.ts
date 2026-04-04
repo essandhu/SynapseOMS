@@ -6,25 +6,42 @@ import type {
   ConcentrationResult,
 } from "../../api/types";
 
+/** Generate a deterministic Monte Carlo P&L distribution for mock data */
+function generateMockDistribution(
+  count: number,
+  mean: number,
+  stddev: number,
+  seed: number,
+): number[] {
+  const result: number[] = [];
+  for (let i = 0; i < count; i++) {
+    // Deterministic pseudo-normal via simple linear congruential approach
+    const t = (i + seed) / count;
+    const z = mean + stddev * Math.tan(Math.PI * (t - 0.5)) * 0.15;
+    result.push(Math.round(z * 100) / 100);
+  }
+  return result;
+}
+
 export const mockVaR: VaRMetrics = {
   historicalVaR: "12500.00",
   parametricVaR: "11200.00",
-  monteCarloVaR: null,
+  monteCarloVaR: "13000.00",
   cvar: "15800.00",
   confidence: 95,
   horizon: "1d",
   computedAt: "2026-04-01T10:00:00Z",
-  monteCarloDistribution: null,
+  monteCarloDistribution: generateMockDistribution(1000, 500, 8000, 42),
 };
 
 export const mockDrawdown: DrawdownData = {
-  current: 0.032,
+  current: -3.2,
   peak: "105000.00",
   trough: "101640.00",
   history: [
-    { date: "2026-03-28", drawdown: 0.01 },
-    { date: "2026-03-29", drawdown: 0.025 },
-    { date: "2026-03-30", drawdown: 0.032 },
+    { date: "2026-03-28", drawdown: -1.0 },
+    { date: "2026-03-29", drawdown: -2.5 },
+    { date: "2026-03-30", drawdown: -3.2 },
   ],
 };
 

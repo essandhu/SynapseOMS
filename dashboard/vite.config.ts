@@ -18,7 +18,7 @@ export default defineConfig({
     css: false,
     env: {
       VITE_API_URL: "http://localhost:8080/api/v1",
-      VITE_RISK_API_URL: "http://localhost:8081",
+      VITE_RISK_API_URL: "http://localhost:8081/",
       VITE_WS_URL: "ws://localhost:8080",
     },
   },
@@ -28,6 +28,11 @@ export default defineConfig({
       "/api/v1": {
         target: "http://localhost:8080",
         changeOrigin: true,
+      },
+      "/risk-api": {
+        target: "http://localhost:8081",
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/risk-api/, ""),
       },
       "/ws": {
         target: "ws://localhost:8080",

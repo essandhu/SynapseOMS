@@ -105,7 +105,7 @@ export function VaRGauge({
 
           {/* Large value */}
           <span className={`-mt-2 font-mono text-2xl font-bold ${twColor}`}>
-            {amount !== null ? formatCurrency(amount) : "$0"}
+            {amount !== null ? formatCurrency(amount) : "—"}
           </span>
 
           {/* NAV percentage */}

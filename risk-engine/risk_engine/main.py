@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 _REPO_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
+import asyncio
 from decimal import Decimal
 from typing import AsyncIterator
 
@@ -212,6 +213,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("ai_modules_disabled", reason="ANTHROPIC_API_KEY not set")
     ai_deps = AIDependencies(**ai_deps_kwargs)
     configure_ai_dependencies(ai_deps)
+
+    # 1e. Hydrate portfolio and settlements from PostgreSQL -------------------
+    if POSTGRES_URL:
+        from risk_engine.db.hydrate import hydrate_portfolio, hydrate_settlements
+        await hydrate_portfolio(portfolio, POSTGRES_URL)
+        await hydrate_settlements(settlement_tracker, POSTGRES_URL)
 
     # 2. Start Kafka consumer (background thread) ---------------------------
     kafka_consumer = PortfolioStateBuilder(
