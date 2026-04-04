@@ -20,7 +20,7 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    location /api/ {
+    location /api/v1/ {
         proxy_pass http://gateway:8080/api/v1/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

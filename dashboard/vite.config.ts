@@ -16,11 +16,16 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
     css: false,
+    env: {
+      VITE_API_URL: "http://localhost:8080/api/v1",
+      VITE_RISK_API_URL: "http://localhost:8081",
+      VITE_WS_URL: "ws://localhost:8080",
+    },
   },
   server: {
     port: 3000,
     proxy: {
-      "/api": {
+      "/api/v1": {
         target: "http://localhost:8080",
         changeOrigin: true,
       },

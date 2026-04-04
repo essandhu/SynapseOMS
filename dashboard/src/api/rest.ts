@@ -42,7 +42,7 @@ const afterResponseErrorHook = (
 };
 
 const api = ky.create({
-  prefixUrl: import.meta.env.VITE_API_URL || "/api",
+  prefixUrl: import.meta.env.VITE_API_URL || "/api/v1",
   timeout: 10_000,
   retry: {
     limit: 3,
@@ -87,7 +87,18 @@ export async function fetchOrder(id: string): Promise<Order> {
 
 /** Submit a new order */
 export async function submitOrder(request: SubmitOrderRequest): Promise<Order> {
-  return api.post("orders", { json: request }).json<Order>();
+  return api
+    .post("orders", {
+      json: {
+        instrument_id: request.instrumentId,
+        side: request.side,
+        type: request.type,
+        quantity: request.quantity,
+        price: request.price,
+        venue_id: request.venueId,
+      },
+    })
+    .json<Order>();
 }
 
 /** Cancel an order by ID */
