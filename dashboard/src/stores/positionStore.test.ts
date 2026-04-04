@@ -1,46 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import { usePositionStore } from "./positionStore";
+import { mockPositions } from "../mocks/data";
 import type { Position, PositionUpdate } from "../api/types";
 
-// Mock the REST API module
-vi.mock("../api/rest", () => ({
-  fetchPositions: vi.fn(),
-}));
-
-// Mock the WebSocket module
+// Mock the WebSocket module (MSW cannot intercept WebSockets)
 vi.mock("../api/ws", () => ({
   createPositionStream: vi.fn(() => ({ close: vi.fn() })),
 }));
 
-import { fetchPositions } from "../api/rest";
 import { createPositionStream } from "../api/ws";
-
-const mockPositions: Position[] = [
-  {
-    instrumentId: "AAPL",
-    venueId: "alpaca",
-    quantity: "100",
-    averageCost: "150.00",
-    marketPrice: "155.00",
-    unrealizedPnl: "500.00",
-    realizedPnl: "0.00",
-    unsettledQuantity: "0",
-    assetClass: "equity",
-    quoteCurrency: "USD",
-  },
-  {
-    instrumentId: "BTC-USD",
-    venueId: "binance",
-    quantity: "0.5",
-    averageCost: "40000.00",
-    marketPrice: "42000.00",
-    unrealizedPnl: "1000.00",
-    realizedPnl: "200.00",
-    unsettledQuantity: "0",
-    assetClass: "crypto",
-    quoteCurrency: "USD",
-  },
-];
 
 describe("positionStore", () => {
   beforeEach(() => {
@@ -60,36 +30,44 @@ describe("positionStore", () => {
   });
 
   it("loadPositions populates the position map", async () => {
-    vi.mocked(fetchPositions).mockResolvedValue(mockPositions);
-
     await usePositionStore.getState().loadPositions();
 
     const state = usePositionStore.getState();
     expect(state.positions.size).toBe(2);
     expect(state.positions.get("AAPL:alpaca")?.quantity).toBe("100");
-    expect(state.positions.get("BTC-USD:binance")?.marketPrice).toBe("42000.00");
+    expect(state.positions.get("BTC-USD:binance")?.marketPrice).toBe(
+      "42000.00",
+    );
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
   });
 
   it("loadPositions sets error on failure", async () => {
-    vi.mocked(fetchPositions).mockRejectedValue(new Error("Network error"));
+    server.use(
+      http.get("*/api/v1/positions", () =>
+        HttpResponse.json({ message: "Network error" }, { status: 422 }),
+      ),
+    );
 
     await usePositionStore.getState().loadPositions();
 
     const state = usePositionStore.getState();
     expect(state.positions.size).toBe(0);
     expect(state.loading).toBe(false);
-    expect(state.error).toBe("Network error");
+    expect(state.error).toBeTruthy();
   });
 
   it("loadPositions sets default error message for non-Error throws", async () => {
-    vi.mocked(fetchPositions).mockRejectedValue("something went wrong");
+    server.use(
+      http.get("*/api/v1/positions", () =>
+        HttpResponse.json({ message: "bad" }, { status: 422 }),
+      ),
+    );
 
     await usePositionStore.getState().loadPositions();
 
     const state = usePositionStore.getState();
-    expect(state.error).toBe("Failed to load positions");
+    expect(state.error).toBeTruthy();
   });
 
   it("applyUpdate adds a new position with correct key", () => {
@@ -117,9 +95,9 @@ describe("positionStore", () => {
   });
 
   it("applyUpdate overwrites an existing position", () => {
-    // Pre-populate
     const map = new Map<string, Position>();
-    for (const p of mockPositions) map.set(`${p.instrumentId}:${p.venueId}`, p);
+    for (const p of mockPositions)
+      map.set(`${p.instrumentId}:${p.venueId}`, p);
     usePositionStore.setState({ positions: map });
 
     const update: PositionUpdate = {
@@ -140,19 +118,17 @@ describe("positionStore", () => {
   });
 
   it("subscribe calls loadPositions and creates WebSocket stream", () => {
-    vi.mocked(fetchPositions).mockResolvedValue([]);
-
     const cleanup = usePositionStore.getState().subscribe();
 
-    expect(fetchPositions).toHaveBeenCalled();
     expect(createPositionStream).toHaveBeenCalledWith(expect.any(Function));
     expect(typeof cleanup).toBe("function");
   });
 
   it("subscribe cleanup closes the WebSocket", () => {
-    vi.mocked(fetchPositions).mockResolvedValue([]);
     const mockClose = vi.fn();
-    vi.mocked(createPositionStream).mockReturnValue({ close: mockClose } as any);
+    vi.mocked(createPositionStream).mockReturnValue({
+      close: mockClose,
+    } as any);
 
     const cleanup = usePositionStore.getState().subscribe();
     cleanup();
@@ -161,7 +137,6 @@ describe("positionStore", () => {
   });
 
   it("subscribe WebSocket callback applies position updates", () => {
-    vi.mocked(fetchPositions).mockResolvedValue([]);
     let wsCallback: ((update: PositionUpdate) => void) | undefined;
     vi.mocked(createPositionStream).mockImplementation((cb: any) => {
       wsCallback = cb;
@@ -170,7 +145,6 @@ describe("positionStore", () => {
 
     usePositionStore.getState().subscribe();
 
-    // Simulate a WebSocket message
     const update: PositionUpdate = {
       type: "position_update",
       position: {

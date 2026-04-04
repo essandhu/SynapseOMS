@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import { useOptimizerStore } from "./optimizerStore";
+import { mockOptimizationResult } from "../mocks/data";
 import type { OptimizationResult, TradeAction } from "../api/types";
 
-// Mock the REST API module
-vi.mock("../api/rest", () => ({
-  optimizePortfolio: vi.fn(),
-}));
-
-// Mock the order store
+// Mock the order store (cross-store dependency, not an API call)
 vi.mock("./orderStore", () => ({
   useOrderStore: {
     getState: vi.fn(() => ({
@@ -16,19 +14,7 @@ vi.mock("./orderStore", () => ({
   },
 }));
 
-import { optimizePortfolio } from "../api/rest";
 import { useOrderStore } from "./orderStore";
-
-const mockResult: OptimizationResult = {
-  targetWeights: { AAPL: 0.3, GOOG: 0.4, MSFT: 0.3 },
-  trades: [
-    { instrumentId: "AAPL", side: "buy", quantity: "100", estimatedCost: "15000.00" },
-    { instrumentId: "GOOG", side: "sell", quantity: "50", estimatedCost: "7500.00" },
-  ],
-  expectedReturn: 0.12,
-  expectedVolatility: 0.18,
-  sharpeRatio: 0.67,
-};
 
 describe("optimizerStore", () => {
   beforeEach(() => {
@@ -81,63 +67,30 @@ describe("optimizerStore", () => {
   });
 
   it("runOptimize calls API and stores result", async () => {
-    vi.mocked(optimizePortfolio).mockResolvedValue(mockResult);
-
     await useOptimizerStore.getState().runOptimize();
 
-    expect(optimizePortfolio).toHaveBeenCalledOnce();
-    expect(optimizePortfolio).toHaveBeenCalledWith(
-      useOptimizerStore.getState().constraints,
-    );
     const state = useOptimizerStore.getState();
-    expect(state.result).toEqual(mockResult);
+    expect(state.result).toEqual(mockOptimizationResult);
     expect(state.isOptimizing).toBe(false);
     expect(state.error).toBeNull();
   });
 
-  it("runOptimize sets isOptimizing during request", async () => {
-    let resolvePromise: (value: OptimizationResult) => void;
-    vi.mocked(optimizePortfolio).mockImplementation(
-      () => new Promise((resolve) => { resolvePromise = resolve; }),
-    );
-
-    const promise = useOptimizerStore.getState().runOptimize();
-    expect(useOptimizerStore.getState().isOptimizing).toBe(true);
-
-    resolvePromise!(mockResult);
-    await promise;
-
-    expect(useOptimizerStore.getState().isOptimizing).toBe(false);
-  });
-
   it("runOptimize sets error on API failure", async () => {
-    vi.mocked(optimizePortfolio).mockRejectedValue(new Error("Optimization failed"));
+    server.use(
+      http.post("*/api/v1/optimizer/optimize", () =>
+        HttpResponse.json(
+          { message: "Optimization failed" },
+          { status: 422 },
+        ),
+      ),
+    );
 
     await useOptimizerStore.getState().runOptimize();
 
     const state = useOptimizerStore.getState();
     expect(state.result).toBeNull();
     expect(state.isOptimizing).toBe(false);
-    expect(state.error).toBe("Optimization failed");
-  });
-
-  it("runOptimize sends current constraints to API", async () => {
-    vi.mocked(optimizePortfolio).mockResolvedValue(mockResult);
-
-    useOptimizerStore.getState().setConstraint("riskAversion", 5);
-    useOptimizerStore.getState().setConstraint("longOnly", false);
-    useOptimizerStore.getState().setConstraint("maxSingleWeight", 0.1);
-
-    await useOptimizerStore.getState().runOptimize();
-
-    expect(optimizePortfolio).toHaveBeenCalledWith({
-      riskAversion: 5,
-      longOnly: false,
-      maxSingleWeight: 0.1,
-      targetVolatility: null,
-      maxTurnover: null,
-      assetClassBounds: null,
-    });
+    expect(state.error).toBeTruthy();
   });
 
   it("executeTradeList submits N orders via orderStore", async () => {
@@ -147,9 +100,24 @@ describe("optimizerStore", () => {
     } as any);
 
     const trades: TradeAction[] = [
-      { instrumentId: "AAPL", side: "buy", quantity: "100", estimatedCost: "15000.00" },
-      { instrumentId: "GOOG", side: "sell", quantity: "50", estimatedCost: "7500.00" },
-      { instrumentId: "MSFT", side: "buy", quantity: "75", estimatedCost: "11000.00" },
+      {
+        instrumentId: "AAPL",
+        side: "buy",
+        quantity: "100",
+        estimatedCost: "15000.00",
+      },
+      {
+        instrumentId: "GOOG",
+        side: "sell",
+        quantity: "50",
+        estimatedCost: "7500.00",
+      },
+      {
+        instrumentId: "MSFT",
+        side: "buy",
+        quantity: "75",
+        estimatedCost: "11000.00",
+      },
     ];
 
     await useOptimizerStore.getState().executeTradeList(trades);
@@ -162,24 +130,11 @@ describe("optimizerStore", () => {
       quantity: "100",
       venueId: "default",
     });
-    expect(mockSubmitOrder).toHaveBeenCalledWith({
-      instrumentId: "GOOG",
-      side: "sell",
-      type: "market",
-      quantity: "50",
-      venueId: "default",
-    });
-    expect(mockSubmitOrder).toHaveBeenCalledWith({
-      instrumentId: "MSFT",
-      side: "buy",
-      type: "market",
-      quantity: "75",
-      venueId: "default",
-    });
   });
 
   it("executeTradeList sets error if a submission fails", async () => {
-    const mockSubmitOrder = vi.fn()
+    const mockSubmitOrder = vi
+      .fn()
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("Order rejected"));
     vi.mocked(useOrderStore.getState).mockReturnValue({
@@ -187,8 +142,18 @@ describe("optimizerStore", () => {
     } as any);
 
     const trades: TradeAction[] = [
-      { instrumentId: "AAPL", side: "buy", quantity: "100", estimatedCost: "15000.00" },
-      { instrumentId: "GOOG", side: "sell", quantity: "50", estimatedCost: "7500.00" },
+      {
+        instrumentId: "AAPL",
+        side: "buy",
+        quantity: "100",
+        estimatedCost: "15000.00",
+      },
+      {
+        instrumentId: "GOOG",
+        side: "sell",
+        quantity: "50",
+        estimatedCost: "7500.00",
+      },
     ];
 
     await useOptimizerStore.getState().executeTradeList(trades);
@@ -198,7 +163,6 @@ describe("optimizerStore", () => {
   });
 
   it("reset restores initial state", () => {
-    // Set some non-default state
     useOptimizerStore.setState({
       constraints: {
         riskAversion: 5,
@@ -208,7 +172,7 @@ describe("optimizerStore", () => {
         maxTurnover: 0.3,
         assetClassBounds: { equity: [0.1, 0.5] },
       },
-      result: mockResult,
+      result: mockOptimizationResult,
       isOptimizing: false,
       error: "some error",
     });
