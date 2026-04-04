@@ -4,6 +4,8 @@ export const mockPortfolioSummary: PortfolioSummary = {
   totalNav: "250000.00",
   totalPnl: "12500.00",
   dailyPnl: "1500.00",
+  cash: "100000.00",
+  availableCash: "95000.00",
   positionCount: 5,
 };
 

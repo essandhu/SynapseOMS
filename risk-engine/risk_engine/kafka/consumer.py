@@ -18,7 +18,7 @@ from collections.abc import Callable
 from decimal import Decimal
 
 import structlog
-from confluent_kafka import Consumer, KafkaError
+from confluent_kafka import Consumer, KafkaError, TopicPartition
 
 from risk_engine.domain.portfolio import Portfolio
 
@@ -106,9 +106,28 @@ class PortfolioStateBuilder:
                     self._interruptible_sleep(backoff)
 
     def _run_consumer(self) -> None:
-        """Create a consumer, subscribe, and poll until error or shutdown."""
+        """Create a consumer, assign partitions, and poll until error or shutdown.
+
+        Uses manual partition assignment instead of subscribe/consumer-group
+        rebalancing. This avoids group coordinator discovery issues and is
+        appropriate for a single-consumer topology.
+        """
         consumer = Consumer(self.consumer_config)
-        consumer.subscribe(["order-lifecycle"])
+
+        # Discover partitions and assign from earliest offset
+        metadata = consumer.list_topics("order-lifecycle", timeout=10)
+        topic_meta = metadata.topics.get("order-lifecycle")
+        if topic_meta is None or topic_meta.error is not None:
+            raise RuntimeError("order-lifecycle topic not available")
+        partitions = [
+            TopicPartition("order-lifecycle", p, 0)  # offset 0 = earliest
+            for p in topic_meta.partitions
+        ]
+        consumer.assign(partitions)
+        logger.info(
+            "kafka_partitions_assigned",
+            partitions=len(partitions),
+        )
 
         try:
             while self._running:

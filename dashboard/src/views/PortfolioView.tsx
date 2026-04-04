@@ -12,8 +12,8 @@ import { PositionTable } from "../components/PositionTable";
 import { ExposureTreemap } from "../components/ExposureTreemap";
 import { usePositionStore } from "../stores/positionStore";
 import { useRiskStore } from "../stores/riskStore";
-import { fetchPortfolioSummary, fetchExposure } from "../api/rest";
-import type { PortfolioSummary, ExposureData } from "../api/types";
+import { fetchPortfolioSummary } from "../api/rest";
+import type { PortfolioSummary } from "../api/types";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -153,7 +153,6 @@ export function PortfolioView() {
   const riskSubscribe = useRiskStore((s) => s.subscribe);
 
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-  const [exposure, setExposure] = useState<ExposureData | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
   // Subscribe to positions & risk on mount
@@ -166,20 +165,16 @@ export function PortfolioView() {
     };
   }, [subscribe, riskSubscribe]);
 
-  // Fetch portfolio summary & exposure
+  // Fetch portfolio summary (cash values)
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setSummaryLoading(true);
       try {
-        const [s, e] = await Promise.all([
-          fetchPortfolioSummary(),
-          fetchExposure(),
-        ]);
+        const s = await fetchPortfolioSummary();
         if (!cancelled) {
           setSummary(s);
-          setExposure(e);
         }
       } catch {
         // API unavailable — leave as null, show placeholder
@@ -195,40 +190,78 @@ export function PortfolioView() {
   }, []);
 
   const positionList = Array.from(positions.values());
-  const totalNav = summary ? Number(summary.totalNav) : undefined;
   const dailyPnl = summary ? Number(summary.dailyPnl) : 0;
   const pnlPositive = dailyPnl >= 0;
 
   // Compute unsettled cash from settlement store
   const unsettledCash = settlement ? Number(settlement.totalUnsettled) : 0;
 
-  // Available cash = NAV - total position market value - unsettled
-  const availableCash = useMemo(() => {
-    if (!totalNav) return undefined;
-    const posMarketValue = positionList.reduce((acc, p) => {
-      return acc + Math.abs(Number(p.quantity) * Number(p.marketPrice));
-    }, 0);
-    return totalNav - posMarketValue - unsettledCash;
-  }, [totalNav, positionList, unsettledCash]);
+  // Cash values from risk engine (only change on fills, not market moves)
+  const cash = summary ? Number(summary.cash) : undefined;
+  const availableCash = summary ? Number(summary.availableCash) : undefined;
 
-  // Exposure data for charts
+  // Compute NAV client-side from live positions + availableCash so it
+  // updates in real-time as market prices change via WebSocket.
+  // Uses availableCash (not cash) to avoid double-counting unsettled T+2
+  // equity purchases where cash hasn't been debited yet but the position
+  // already exists.
+  const totalNav = useMemo(() => {
+    if (availableCash === undefined) return undefined;
+    const posMarketValue = positionList.reduce((acc, p) => {
+      return acc + Number(p.quantity) * Number(p.marketPrice);
+    }, 0);
+    return availableCash + posMarketValue;
+  }, [availableCash, positionList]);
+
+  // Re-fetch portfolio summary periodically so cash values stay current
+  // after fills are processed by the risk engine via Kafka.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const s = await fetchPortfolioSummary();
+        setSummary(s);
+      } catch {
+        // Risk engine may be unavailable — keep previous values
+      }
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Compute exposure from live position data so it always reflects current
+  // positions even when the risk engine's Kafka pipeline is unavailable.
   const assetClassData = useMemo(() => {
-    if (!exposure) return [];
-    return exposure.byAssetClass.map((e) => ({
-      name: e.assetClass,
-      value: e.percentage,
-      color: ASSET_CLASS_COLORS[e.assetClass] ?? "#6b7280",
+    if (positionList.length === 0) return [];
+    const groups: Record<string, number> = {};
+    let total = 0;
+    for (const p of positionList) {
+      const mv = Math.abs(Number(p.quantity) * Number(p.marketPrice));
+      groups[p.assetClass] = (groups[p.assetClass] ?? 0) + mv;
+      total += mv;
+    }
+    if (total === 0) return [];
+    return Object.entries(groups).map(([name, value]) => ({
+      name,
+      value: (value / total) * 100,
+      color: ASSET_CLASS_COLORS[name] ?? "#6b7280",
     }));
-  }, [exposure]);
+  }, [positionList]);
 
   const venueData = useMemo(() => {
-    if (!exposure) return [];
-    return exposure.byVenue.map((e) => ({
-      venueId: e.venueId,
-      percentage: e.percentage,
-      notional: Number(e.notional),
+    if (positionList.length === 0) return [];
+    const groups: Record<string, number> = {};
+    let total = 0;
+    for (const p of positionList) {
+      const mv = Math.abs(Number(p.quantity) * Number(p.marketPrice));
+      groups[p.venueId] = (groups[p.venueId] ?? 0) + mv;
+      total += mv;
+    }
+    if (total === 0) return [];
+    return Object.entries(groups).map(([venueId, value]) => ({
+      venueId,
+      percentage: (value / total) * 100,
+      notional: value,
     }));
-  }, [exposure]);
+  }, [positionList]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -252,7 +285,7 @@ export function PortfolioView() {
       <div className="grid grid-cols-4 gap-3">
         <SummaryCard
           label="Total NAV"
-          value={summary ? formatCurrency(summary.totalNav) : "$--"}
+          value={totalNav !== undefined ? formatCurrency(totalNav) : "$--"}
           loading={summaryLoading}
         />
         <SummaryCard
@@ -296,7 +329,7 @@ export function PortfolioView() {
             Exposure by Asset Class
           </h3>
           <div className="relative h-48">
-            {summaryLoading ? (
+            {posLoading ? (
               <div className="flex h-full items-center justify-center font-mono text-xs text-text-muted animate-pulse">
                 Loading...
               </div>
@@ -329,7 +362,7 @@ export function PortfolioView() {
             Exposure by Venue
           </h3>
           <div className="h-48">
-            {summaryLoading ? (
+            {posLoading ? (
               <div className="flex h-full items-center justify-center font-mono text-xs text-text-muted animate-pulse">
                 Loading...
               </div>

@@ -423,6 +423,8 @@ async def get_portfolio(
             "totalNav": str(portfolio.nav),
             "totalPnl": str(total_pnl),
             "dailyPnl": str(total_pnl),
+            "cash": str(portfolio.cash),
+            "availableCash": str(portfolio.available_cash),
             "positionCount": position_count,
         }
 

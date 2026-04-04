@@ -144,6 +144,8 @@ export interface PortfolioSummary {
   totalNav: string;
   totalPnl: string;
   dailyPnl: string;
+  cash: string;
+  availableCash: string;
   positionCount: number;
 }
 

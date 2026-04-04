@@ -127,12 +127,34 @@ class TestPortfolioEndpoint:
         float(data["totalPnl"])
         float(data["dailyPnl"])
 
+    def test_get_portfolio_includes_cash_fields(self, client: TestClient) -> None:
+        """Should return cash and availableCash as decimal strings."""
+        resp = client.get("/api/v1/portfolio")
+        data = resp.json()
+
+        assert "cash" in data, "portfolio response must include 'cash'"
+        assert "availableCash" in data, "portfolio response must include 'availableCash'"
+        # Values should be parseable as decimals
+        cash = float(data["cash"])
+        available = float(data["availableCash"])
+        assert cash > 0, "cash should be positive for a funded portfolio"
+        assert available > 0, "availableCash should be positive for a funded portfolio"
+
     def test_get_portfolio_empty(self, empty_client: TestClient) -> None:
         """Empty portfolio should return zero positions."""
         resp = empty_client.get("/api/v1/portfolio")
         assert resp.status_code == 200
         data = resp.json()
         assert data["positionCount"] == 0
+
+    def test_get_portfolio_empty_includes_cash_fields(
+        self, empty_client: TestClient
+    ) -> None:
+        """Empty portfolio should still return cash fields."""
+        resp = empty_client.get("/api/v1/portfolio")
+        data = resp.json()
+        assert "cash" in data
+        assert "availableCash" in data
 
 
 class TestExposureEndpoint:

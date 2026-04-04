@@ -39,7 +39,7 @@ def _pos(
 def _portfolio(positions: list[Position], cash: Decimal = Decimal("0")) -> Portfolio:
     """Build a Portfolio from a list of positions and recompute NAV."""
     pos_dict = {p.instrument_id: p for p in positions}
-    pf = Portfolio(positions=pos_dict, cash=cash)
+    pf = Portfolio(positions=pos_dict, cash=cash, available_cash=cash)
     pf.compute_nav()
     return pf
 

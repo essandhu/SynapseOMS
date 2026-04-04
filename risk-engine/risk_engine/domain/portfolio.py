@@ -22,6 +22,10 @@ class Portfolio:
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
+    def __post_init__(self) -> None:
+        """Compute initial NAV so it reflects cash + positions on creation."""
+        self._recompute_nav()
+
     # ------------------------------------------------------------------
     # Fill application
     # ------------------------------------------------------------------
@@ -138,11 +142,19 @@ class Portfolio:
             return self._recompute_nav()
 
     def _recompute_nav(self) -> Decimal:
-        """Internal NAV recomputation — caller must hold ``_lock``."""
+        """Internal NAV recomputation — caller must hold ``_lock``.
+
+        NAV = available_cash + positions_market_value
+
+        ``available_cash`` already reflects all committed transactions:
+        reduced by buys (including unsettled T+2) and increased by sells.
+        This avoids double-counting unsettled equity purchases where
+        ``cash`` hasn't been debited yet but the position already exists.
+        """
         positions_value = sum(
             (p.quantity * p.market_price for p in self.positions.values()),
             Decimal("0"),
         )
-        self.nav = self.cash + positions_value + self.unsettled_cash
+        self.nav = self.available_cash + positions_value
         self.updated_at = datetime.now(timezone.utc)
         return self.nav

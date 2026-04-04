@@ -182,6 +182,8 @@ export const PortfolioSummarySchema = z.object({
   totalNav: z.string(),
   totalPnl: z.string(),
   dailyPnl: z.string(),
+  cash: z.string(),
+  availableCash: z.string(),
   positionCount: z.number().int(),
 });
 
