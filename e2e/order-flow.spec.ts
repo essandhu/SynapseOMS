@@ -1,33 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { completeOnboarding } from "./helpers/onboarding";
 
 test.describe("Order Flow E2E", () => {
   test("complete onboarding and submit order through to fill", async ({
     page,
   }) => {
-    await page.goto("/onboarding");
-
-    // Step 1: Welcome — click "Get Started"
-    await expect(page.getByText("Get Started")).toBeVisible();
-    await page.getByText("Get Started").click();
-
-    // Step 2: Passphrase — enter and confirm
-    const passwordInputs = page.locator('input[type="password"]');
-    await passwordInputs.nth(0).fill("TestPassphrase123!");
-    await passwordInputs.nth(1).fill("TestPassphrase123!");
-    await page.getByText("Continue").click();
-
-    // Step 3: Venue — select simulator and skip to finish
-    await page.getByText("Start with Simulator").click();
-    await page.getByText("Skip to Finish").click();
-
-    // Step 5: Ready — enter the terminal
-    await expect(page.getByText("Open Trading Terminal")).toBeVisible();
-    await page.getByText("Open Trading Terminal").click();
-
-    // Now on BlotterView — the order ticket should be visible
-    await expect(page.getByText("Submit Order")).toBeVisible({
-      timeout: 10_000,
-    });
+    await completeOnboarding(page);
 
     // Select Buy side (should be default, but click to be sure)
     await page.getByRole("button", { name: "Buy" }).click();

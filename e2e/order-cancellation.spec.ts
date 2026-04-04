@@ -1,25 +1,5 @@
 import { test, expect } from "@playwright/test";
-
-/**
- * Shared helper: complete onboarding with the simulator venue.
- */
-async function completeOnboarding(page: import("@playwright/test").Page) {
-  await page.goto("/onboarding");
-  await page.getByText("Get Started").click();
-
-  const passwordInputs = page.locator('input[type="password"]');
-  await passwordInputs.nth(0).fill("TestPassphrase123!");
-  await passwordInputs.nth(1).fill("TestPassphrase123!");
-  await page.getByText("Continue").click();
-
-  await page.getByText("Start with Simulator").click();
-  await page.getByText("Skip to Finish").click();
-
-  await page.getByText("Open Trading Terminal").click();
-  await expect(page.getByText("Submit Order")).toBeVisible({
-    timeout: 10_000,
-  });
-}
+import { completeOnboarding } from "./helpers/onboarding";
 
 test.describe("Order Cancellation E2E", () => {
   test("submit limit order, verify acknowledged, cancel, verify canceled", async ({
@@ -49,12 +29,14 @@ test.describe("Order Cancellation E2E", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // Click cancel on the order
-    const cancelButton = page.getByRole("button", { name: /cancel/i }).first();
+    const cancelButton = page
+      .getByRole("button", { name: /cancel/i })
+      .first();
     await cancelButton.click();
 
     // Verify order status changes to "Canceled"
-    await expect(
-      page.getByText(/canceled|cancelled/i),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/canceled|cancelled/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });

@@ -9,8 +9,11 @@ export default defineConfig({
   },
   fullyParallel: false,
   retries: 1,
+  reporter: process.env.CI
+    ? [["html", { open: "never" }], ["list"]]
+    : [["list"]],
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },

@@ -1,25 +1,5 @@
 import { test, expect } from "@playwright/test";
-
-/**
- * Shared helper: complete onboarding with the simulator venue.
- */
-async function completeOnboarding(page: import("@playwright/test").Page) {
-  await page.goto("/onboarding");
-  await page.getByText("Get Started").click();
-
-  const passwordInputs = page.locator('input[type="password"]');
-  await passwordInputs.nth(0).fill("TestPassphrase123!");
-  await passwordInputs.nth(1).fill("TestPassphrase123!");
-  await page.getByText("Continue").click();
-
-  await page.getByText("Start with Simulator").click();
-  await page.getByText("Skip to Finish").click();
-
-  await page.getByText("Open Trading Terminal").click();
-  await expect(page.getByText("Submit Order")).toBeVisible({
-    timeout: 10_000,
-  });
-}
+import { completeOnboarding, submitMarketBuy } from "./helpers/onboarding";
 
 test.describe("Multi-Venue Portfolio E2E", () => {
   test("connect two venues, submit orders, verify unified portfolio", async ({
@@ -28,9 +8,7 @@ test.describe("Multi-Venue Portfolio E2E", () => {
     await completeOnboarding(page);
 
     // Submit a market buy for AAPL (equity)
-    await page.getByRole("button", { name: "Buy" }).click();
-    await page.locator('input[placeholder="0"]').first().fill("10");
-    await page.getByText("Submit Order").click();
+    await submitMarketBuy(page, "10");
     await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Venues to connect a second venue (simulated crypto)
@@ -46,10 +24,7 @@ test.describe("Multi-Venue Portfolio E2E", () => {
     await instrumentSelect.selectOption("BTC-USD");
 
     // Submit a buy for BTC-USD (crypto)
-    await page.getByRole("button", { name: "Buy" }).click();
-    await page.locator('input[placeholder="0"]').first().clear();
-    await page.locator('input[placeholder="0"]').first().fill("1");
-    await page.getByText("Submit Order").click();
+    await submitMarketBuy(page, "1");
 
     // Wait for the second fill
     await page.waitForTimeout(3000);
