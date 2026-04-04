@@ -1,5 +1,5 @@
 export { makeOrder, mockOrders, toRawOrder } from "./orders";
-export { mockPositions } from "./positions";
+export { mockPositions, toRawPosition } from "./positions";
 export { mockVenues } from "./venues";
 export { mockInstruments } from "./instruments";
 export {

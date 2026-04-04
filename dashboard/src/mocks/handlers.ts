@@ -4,6 +4,7 @@ import {
   makeOrder,
   toRawOrder,
   mockPositions,
+  toRawPosition,
   mockVenues,
   mockInstruments,
   mockVaR,
@@ -56,7 +57,7 @@ const gatewayHandlers = [
 
   http.delete("*/api/v1/orders/:id", () => new HttpResponse(null, { status: 204 })),
 
-  http.get("*/api/v1/positions", () => HttpResponse.json(mockPositions)),
+  http.get("*/api/v1/positions", () => HttpResponse.json(mockPositions.map(toRawPosition))),
 
   http.get("*/api/v1/instruments", () => HttpResponse.json(mockInstruments)),
 

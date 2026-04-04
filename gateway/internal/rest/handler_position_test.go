@@ -24,6 +24,8 @@ func TestListPositions_ReturnsPositions(t *testing.T) {
 				RealizedPnL:       decimal.Zero,
 				UnsettledQuantity: decimal.Zero,
 				SettledQuantity:   decimal.NewFromFloat(1.5),
+				AssetClass:        domain.AssetClassCrypto,
+				QuoteCurrency:     "USD",
 				UpdatedAt:         now,
 			},
 			{
@@ -36,6 +38,8 @@ func TestListPositions_ReturnsPositions(t *testing.T) {
 				RealizedPnL:       decimal.NewFromFloat(500),
 				UnsettledQuantity: decimal.Zero,
 				SettledQuantity:   decimal.NewFromFloat(10),
+				AssetClass:        domain.AssetClassCrypto,
+				QuoteCurrency:     "USD",
 				UpdatedAt:         now,
 			},
 		},
@@ -67,6 +71,13 @@ func TestListPositions_ReturnsPositions(t *testing.T) {
 	// Decimal fields should be serialized as strings.
 	if positions[0]["quantity"] != "1.5" {
 		t.Errorf("expected quantity '1.5', got %v", positions[0]["quantity"])
+	}
+	// asset_class and quote_currency must be present in the response
+	if positions[0]["asset_class"] != "crypto" {
+		t.Errorf("expected asset_class 'crypto', got %v", positions[0]["asset_class"])
+	}
+	if positions[0]["quote_currency"] != "USD" {
+		t.Errorf("expected quote_currency 'USD', got %v", positions[0]["quote_currency"])
 	}
 }
 

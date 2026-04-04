@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { mapOrder, mapRawOrderUpdate } from "./mappers";
-import type { Order } from "./types";
+import { mapOrder, mapRawOrderUpdate, mapPosition, mapRawPositionUpdate } from "./mappers";
+import type { Order, Position } from "./types";
 
 describe("mapOrder", () => {
   it("maps snake_case API response to camelCase Order", () => {
@@ -190,5 +190,135 @@ describe("mapRawOrderUpdate", () => {
 
     expect(update.type).toBe("order_update");
     expect(update.order.instrumentId).toBe("TSLA");
+  });
+});
+
+describe("mapPosition", () => {
+  it("maps snake_case API response to camelCase Position", () => {
+    const raw = {
+      instrument_id: "AAPL",
+      venue_id: "alpaca",
+      quantity: "100",
+      average_cost: "150.00",
+      market_price: "155.00",
+      unrealized_pnl: "500.00",
+      realized_pnl: "0.00",
+      unsettled_quantity: "0",
+      asset_class: "equity",
+      quote_currency: "USD",
+    };
+
+    const pos = mapPosition(raw);
+
+    expect(pos.instrumentId).toBe("AAPL");
+    expect(pos.venueId).toBe("alpaca");
+    expect(pos.quantity).toBe("100");
+    expect(pos.averageCost).toBe("150.00");
+    expect(pos.marketPrice).toBe("155.00");
+    expect(pos.unrealizedPnl).toBe("500.00");
+    expect(pos.realizedPnl).toBe("0.00");
+    expect(pos.unsettledQuantity).toBe("0");
+    expect(pos.assetClass).toBe("equity");
+    expect(pos.quoteCurrency).toBe("USD");
+  });
+
+  it("handles missing optional fields with sensible defaults", () => {
+    const raw = {
+      instrument_id: "BTC-USD",
+      venue_id: "binance",
+      quantity: "1.5",
+    };
+
+    const pos = mapPosition(raw);
+
+    expect(pos.instrumentId).toBe("BTC-USD");
+    expect(pos.venueId).toBe("binance");
+    expect(pos.quantity).toBe("1.5");
+    expect(pos.averageCost).toBe("0");
+    expect(pos.marketPrice).toBe("0");
+    expect(pos.unrealizedPnl).toBe("0");
+    expect(pos.realizedPnl).toBe("0");
+    expect(pos.unsettledQuantity).toBe("0");
+    expect(pos.assetClass).toBe("");
+    expect(pos.quoteCurrency).toBe("");
+  });
+
+  it("passes through data that is already camelCase", () => {
+    const camelCase: Position = {
+      instrumentId: "GOOG",
+      venueId: "alpaca",
+      quantity: "50",
+      averageCost: "2800.00",
+      marketPrice: "2850.00",
+      unrealizedPnl: "2500.00",
+      realizedPnl: "100.00",
+      unsettledQuantity: "10",
+      assetClass: "equity",
+      quoteCurrency: "USD",
+    };
+
+    const pos = mapPosition(camelCase);
+
+    expect(pos.instrumentId).toBe("GOOG");
+    expect(pos.venueId).toBe("alpaca");
+    expect(pos.averageCost).toBe("2800.00");
+    expect(pos.marketPrice).toBe("2850.00");
+    expect(pos.unrealizedPnl).toBe("2500.00");
+    expect(pos.quoteCurrency).toBe("USD");
+  });
+});
+
+describe("mapRawPositionUpdate", () => {
+  it("extracts position from 'data' envelope and maps to camelCase", () => {
+    const rawMessage = {
+      type: "position_update",
+      data: {
+        instrument_id: "AAPL",
+        venue_id: "alpaca",
+        quantity: "200",
+        average_cost: "152.00",
+        market_price: "160.00",
+        unrealized_pnl: "1600.00",
+        realized_pnl: "0.00",
+        unsettled_quantity: "50",
+        asset_class: "equity",
+        quote_currency: "USD",
+      },
+    };
+
+    const update = mapRawPositionUpdate(rawMessage);
+
+    expect(update.type).toBe("position_update");
+    expect(update.position.instrumentId).toBe("AAPL");
+    expect(update.position.venueId).toBe("alpaca");
+    expect(update.position.quantity).toBe("200");
+    expect(update.position.averageCost).toBe("152.00");
+    expect(update.position.marketPrice).toBe("160.00");
+    expect(update.position.unrealizedPnl).toBe("1600.00");
+    expect(update.position.unsettledQuantity).toBe("50");
+  });
+
+  it("handles 'position' envelope key as well (forward compatibility)", () => {
+    const rawMessage = {
+      type: "position_update",
+      position: {
+        instrument_id: "ETH-USD",
+        venue_id: "binance",
+        quantity: "10",
+        average_cost: "3000.00",
+        market_price: "3100.00",
+        unrealized_pnl: "1000.00",
+        realized_pnl: "0.00",
+        unsettled_quantity: "0",
+        asset_class: "crypto",
+        quote_currency: "USD",
+      },
+    };
+
+    const update = mapRawPositionUpdate(rawMessage);
+
+    expect(update.type).toBe("position_update");
+    expect(update.position.instrumentId).toBe("ETH-USD");
+    expect(update.position.venueId).toBe("binance");
   });
 });

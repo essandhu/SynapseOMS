@@ -67,3 +67,12 @@ func (p *Position) ApplyFill(fill Fill, side OrderSide) error {
 	p.UpdatedAt = time.Now()
 	return nil
 }
+
+// UpdateMarketPrice sets the current market price and recomputes unrealized P&L.
+// UnrealizedPnL = (marketPrice - averageCost) * quantity
+// This naturally handles both long (positive qty) and short (negative qty) positions.
+func (p *Position) UpdateMarketPrice(price decimal.Decimal) {
+	p.MarketPrice = price
+	p.UnrealizedPnL = price.Sub(p.AverageCost).Mul(p.Quantity)
+	p.UpdatedAt = time.Now()
+}

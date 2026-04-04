@@ -172,3 +172,71 @@ func TestPositionApplyFill(t *testing.T) {
 		})
 	}
 }
+
+func TestPositionUpdateMarketPrice(t *testing.T) {
+	tests := []struct {
+		name             string
+		position         Position
+		newPrice         decimal.Decimal
+		wantMarketPrice  decimal.Decimal
+		wantUnrealized   decimal.Decimal
+	}{
+		{
+			name: "long position with profit",
+			position: Position{
+				Quantity:    decimal.NewFromInt(100),
+				AverageCost: decimal.NewFromFloat(150.0),
+			},
+			newPrice:        decimal.NewFromFloat(160.0),
+			wantMarketPrice: decimal.NewFromFloat(160.0),
+			// unrealized = (160 - 150) * 100 = 1000
+			wantUnrealized: decimal.NewFromInt(1000),
+		},
+		{
+			name: "long position with loss",
+			position: Position{
+				Quantity:    decimal.NewFromInt(50),
+				AverageCost: decimal.NewFromFloat(200.0),
+			},
+			newPrice:        decimal.NewFromFloat(180.0),
+			wantMarketPrice: decimal.NewFromFloat(180.0),
+			// unrealized = (180 - 200) * 50 = -1000
+			wantUnrealized: decimal.NewFromInt(-1000),
+		},
+		{
+			name: "short position with profit",
+			position: Position{
+				Quantity:    decimal.NewFromInt(-10),
+				AverageCost: decimal.NewFromFloat(200.0),
+			},
+			newPrice:        decimal.NewFromFloat(180.0),
+			wantMarketPrice: decimal.NewFromFloat(180.0),
+			// unrealized = (180 - 200) * (-10) = 200
+			wantUnrealized: decimal.NewFromInt(200),
+		},
+		{
+			name: "zero quantity position",
+			position: Position{
+				Quantity:    decimal.Zero,
+				AverageCost: decimal.NewFromFloat(100.0),
+			},
+			newPrice:        decimal.NewFromFloat(110.0),
+			wantMarketPrice: decimal.NewFromFloat(110.0),
+			wantUnrealized:  decimal.Zero,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos := tt.position
+			pos.UpdateMarketPrice(tt.newPrice)
+
+			if !pos.MarketPrice.Equal(tt.wantMarketPrice) {
+				t.Errorf("MarketPrice = %s, want %s", pos.MarketPrice, tt.wantMarketPrice)
+			}
+			if !pos.UnrealizedPnL.Equal(tt.wantUnrealized) {
+				t.Errorf("UnrealizedPnL = %s, want %s", pos.UnrealizedPnL, tt.wantUnrealized)
+			}
+		})
+	}
+}

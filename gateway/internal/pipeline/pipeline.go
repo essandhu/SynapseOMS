@@ -717,11 +717,14 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 	// Update position
 	pos, err := p.store.GetPosition(ctx, order.InstrumentID, order.VenueID)
 	if err != nil {
-		// Position doesn't exist yet -- create a new one
+		// Position doesn't exist yet -- create a new one.
+		// Set initial market price from the fill so the position has a
+		// non-zero price before the market data feed provides updates.
 		pos = &domain.Position{
 			InstrumentID: order.InstrumentID,
 			VenueID:      order.VenueID,
 			AssetClass:   order.AssetClass,
+			MarketPrice:  fill.Price,
 		}
 	}
 
@@ -732,6 +735,11 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 		)
 		return
 	}
+
+	// Recompute unrealized P&L using current market price.
+	// For new positions the market price was seeded from the fill price above;
+	// for existing positions it reflects the latest market data.
+	pos.UpdateMarketPrice(pos.MarketPrice)
 
 	if err := p.store.UpsertPosition(ctx, pos); err != nil {
 		p.logger.Error("failed to persist position",

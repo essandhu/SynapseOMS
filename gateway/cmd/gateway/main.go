@@ -416,6 +416,9 @@ func main() {
 		}
 	}()
 
+	// Create position pricer to update market prices and unrealized P&L from market data.
+	posPricer := pipeline.NewPositionPricer(pgStore, hub)
+
 	// Subscribe to market data from all connected adapters and feed to both aggregators.
 	for _, v := range venues {
 		if v.Status() != adapter.Connected {
@@ -433,6 +436,7 @@ func main() {
 			for snap := range ch {
 				mdAgg1m.Ingest(snap)
 				mdAgg5m.Ingest(snap)
+				posPricer.OnMarketData(ctx, snap)
 			}
 		}(mdChan, v.VenueID())
 		logger.Info("subscribed to market data", slog.String("venue", v.VenueID()))

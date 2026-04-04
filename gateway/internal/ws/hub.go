@@ -61,6 +61,8 @@ type positionData struct {
 	RealizedPnL       string    `json:"realized_pnl"`
 	UnsettledQuantity string    `json:"unsettled_quantity"`
 	SettledQuantity   string    `json:"settled_quantity"`
+	AssetClass        string    `json:"asset_class"`
+	QuoteCurrency     string    `json:"quote_currency"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
@@ -258,6 +260,8 @@ func (h *Hub) NotifyPositionUpdate(position *domain.Position) {
 		RealizedPnL:       position.RealizedPnL.String(),
 		UnsettledQuantity: position.UnsettledQuantity.String(),
 		SettledQuantity:   position.SettledQuantity.String(),
+		AssetClass:        assetClassStr(position.AssetClass),
+		QuoteCurrency:     position.QuoteCurrency,
 		UpdatedAt:         position.UpdatedAt,
 	}
 

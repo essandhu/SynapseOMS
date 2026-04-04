@@ -1,4 +1,4 @@
-import type { Order, OrderUpdate, Fill } from "./types";
+import type { Order, OrderUpdate, Fill, Position, PositionUpdate } from "./types";
 
 /**
  * Maps a raw API/WebSocket order object (snake_case JSON from Go backend)
@@ -57,5 +57,45 @@ export function mapRawOrderUpdate(raw: any): OrderUpdate {
   return {
     type: "order_update",
     order: mapOrder(orderData),
+  };
+}
+
+/**
+ * Maps a raw API/WebSocket position object (snake_case JSON from Go backend)
+ * to the frontend Position type (camelCase).
+ *
+ * Handles both snake_case and camelCase input gracefully so that mock
+ * data and real backend responses both work.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapPosition(raw: any): Position {
+  return {
+    instrumentId: raw.instrumentId ?? raw.instrument_id ?? "",
+    venueId: raw.venueId ?? raw.venue_id ?? "",
+    quantity: raw.quantity ?? "0",
+    averageCost: raw.averageCost ?? raw.average_cost ?? "0",
+    marketPrice: raw.marketPrice ?? raw.market_price ?? "0",
+    unrealizedPnl: raw.unrealizedPnl ?? raw.unrealized_pnl ?? "0",
+    realizedPnl: raw.realizedPnl ?? raw.realized_pnl ?? "0",
+    unsettledQuantity: raw.unsettledQuantity ?? raw.unsettled_quantity ?? "0",
+    assetClass: raw.assetClass ?? raw.asset_class ?? "",
+    quoteCurrency: raw.quoteCurrency ?? raw.quote_currency ?? "",
+  };
+}
+
+/**
+ * Maps a raw WebSocket message to a PositionUpdate.
+ *
+ * The Go backend sends: { "type": "position_update", "data": {...} }
+ * The frontend PositionUpdate expects: { type: "position_update", position: Position }
+ *
+ * This function bridges the mismatch, accepting either "data" or "position" key.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapRawPositionUpdate(raw: any): PositionUpdate {
+  const positionData = raw.data ?? raw.position;
+  return {
+    type: "position_update",
+    position: mapPosition(positionData),
   };
 }

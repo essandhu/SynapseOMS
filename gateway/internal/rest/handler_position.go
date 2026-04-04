@@ -21,6 +21,8 @@ type positionResponse struct {
 	RealizedPnL       string    `json:"realized_pnl"`
 	UnsettledQuantity string    `json:"unsettled_quantity"`
 	SettledQuantity   string    `json:"settled_quantity"`
+	AssetClass        string    `json:"asset_class"`
+	QuoteCurrency     string    `json:"quote_currency"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
@@ -35,6 +37,8 @@ func toPositionResponse(p *domain.Position) positionResponse {
 		RealizedPnL:       p.RealizedPnL.String(),
 		UnsettledQuantity: p.UnsettledQuantity.String(),
 		SettledQuantity:   p.SettledQuantity.String(),
+		AssetClass:        assetClassStr(p.AssetClass),
+		QuoteCurrency:     p.QuoteCurrency,
 		UpdatedAt:         p.UpdatedAt,
 	}
 }

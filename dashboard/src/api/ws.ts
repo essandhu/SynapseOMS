@@ -6,7 +6,7 @@ import type {
   AnomalyAlert,
   OHLCUpdate,
 } from "./types";
-import { mapRawOrderUpdate } from "./mappers";
+import { mapRawOrderUpdate, mapRawPositionUpdate } from "./mappers";
 
 const BASE_WS = import.meta.env.VITE_WS_URL || "ws://localhost:8080";
 
@@ -75,8 +75,9 @@ export function createPositionStream(
 
   ws.addEventListener("message", (event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data as string) as PositionUpdate;
-      onUpdate(data);
+      const raw = JSON.parse(event.data as string);
+      const update = mapRawPositionUpdate(raw);
+      onUpdate(update);
     } catch {
       console.error("[ws:positions] Failed to parse message");
     }

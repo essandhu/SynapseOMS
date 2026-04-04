@@ -18,7 +18,7 @@ import type {
   AnomalyAlert,
   RebalanceResult,
 } from "./types";
-import { mapOrder } from "./mappers";
+import { mapOrder, mapPosition } from "./mappers";
 
 /**
  * Error handler hook that fires a CustomEvent for UI toast notifications.
@@ -112,7 +112,8 @@ export async function cancelOrder(id: string): Promise<void> {
 
 /** Fetch all positions */
 export async function fetchPositions(): Promise<Position[]> {
-  return api.get("positions").json<Position[]>();
+  const raw = await api.get("positions").json<unknown[]>();
+  return raw.map(mapPosition);
 }
 
 /** Fetch all instruments */

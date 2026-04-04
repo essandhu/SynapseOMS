@@ -1116,6 +1116,53 @@ func TestOrderPersistedBeforeRESTResponse(t *testing.T) {
 	}
 }
 
+// TestNewPositionHasMarketPriceFromFill verifies that when a fill creates a
+// new position, the market price is seeded from the fill price and unrealized
+// P&L is computed.
+func TestNewPositionHasMarketPriceFromFill(t *testing.T) {
+	store := newMemStore()
+	notifier := newMockNotifier()
+
+	venue := &syncFillVenue{
+		fillCh:  make(chan domain.Fill, 100),
+		venueID: "sim-exchange",
+		status:  adapter.Connected,
+	}
+
+	p := makePipelineWith(store, venue, notifier)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.Start(ctx)
+
+	order := makeOrder()
+	if err := p.Submit(ctx, order); err != nil {
+		t.Fatalf("Submit failed: %v", err)
+	}
+
+	// Wait for fill to be processed
+	waitFor(t, 5*time.Second, func() bool {
+		o := store.getOrder(order.ID)
+		return o != nil && o.Status == domain.OrderStatusFilled
+	}, "order to be filled")
+
+	pos := store.getPosition("AAPL", "sim-exchange")
+	if pos == nil {
+		t.Fatal("expected position to exist after fill")
+	}
+
+	// Market price should be seeded from the fill price (185.50)
+	expectedPrice := decimal.NewFromFloat(185.50)
+	if !pos.MarketPrice.Equal(expectedPrice) {
+		t.Errorf("MarketPrice = %s, want %s", pos.MarketPrice, expectedPrice)
+	}
+
+	// For a new position, avg cost equals fill price, so unrealized P&L should be 0
+	// (market price == average cost for a single-fill position)
+	if !pos.UnrealizedPnL.IsZero() {
+		t.Errorf("UnrealizedPnL = %s, want 0 (market price == avg cost)", pos.UnrealizedPnL)
+	}
+}
+
 // syncFillVenue is a mock venue that sends fills synchronously during
 // SubmitOrder, mimicking the real simulated exchange behavior.
 type syncFillVenue struct {

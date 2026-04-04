@@ -1,5 +1,24 @@
 import type { Position } from "../../api/types";
 
+/**
+ * Converts a camelCase Position to the snake_case JSON the Go backend actually returns.
+ * Used by MSW handlers to realistically simulate backend responses.
+ */
+export function toRawPosition(pos: Position): Record<string, unknown> {
+  return {
+    instrument_id: pos.instrumentId,
+    venue_id: pos.venueId,
+    quantity: pos.quantity,
+    average_cost: pos.averageCost,
+    market_price: pos.marketPrice,
+    unrealized_pnl: pos.unrealizedPnl,
+    realized_pnl: pos.realizedPnl,
+    unsettled_quantity: pos.unsettledQuantity,
+    asset_class: pos.assetClass,
+    quote_currency: pos.quoteCurrency,
+  };
+}
+
 export const mockPositions: Position[] = [
   {
     instrumentId: "AAPL",
