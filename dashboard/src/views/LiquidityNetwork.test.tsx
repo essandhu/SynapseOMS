@@ -49,7 +49,7 @@ const sampleVenues: Venue[] = [
     hasCredentials: true,
   },
   {
-    id: "binance",
+    id: "binance_testnet",
     name: "Binance Testnet",
     type: "exchange",
     status: "disconnected",

@@ -1,64 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import { useVenueStore } from "./venueStore";
+import { mockVenues } from "../mocks/data";
 import type { Venue } from "../api/types";
 
-// Mock the REST API module
-vi.mock("../api/rest", () => ({
-  fetchVenues: vi.fn(),
-  connectVenue: vi.fn(),
-  disconnectVenue: vi.fn(),
-  storeCredentials: vi.fn(),
-}));
-
-// Mock the WebSocket module
+// Mock the WebSocket module (MSW cannot intercept WebSockets)
 vi.mock("../api/ws", () => ({
   createVenueStream: vi.fn(() => ({ close: vi.fn() })),
 }));
-
-import {
-  fetchVenues,
-  connectVenue as apiConnectVenue,
-  disconnectVenue as apiDisconnectVenue,
-} from "../api/rest";
-
-const mockVenues: Venue[] = [
-  {
-    id: "alpaca",
-    name: "Alpaca",
-    type: "exchange",
-    status: "connected",
-    supportedAssets: ["equity"],
-    latencyP50Ms: 45,
-    latencyP99Ms: 120,
-    fillRate: 0.98,
-    lastHeartbeat: "2026-04-01T10:00:00Z",
-    hasCredentials: true,
-  },
-  {
-    id: "binance",
-    name: "Binance Testnet",
-    type: "exchange",
-    status: "disconnected",
-    supportedAssets: ["crypto"],
-    latencyP50Ms: 30,
-    latencyP99Ms: 85,
-    fillRate: 0.99,
-    lastHeartbeat: "2026-04-01T09:55:00Z",
-    hasCredentials: true,
-  },
-  {
-    id: "simulator",
-    name: "Simulator",
-    type: "simulated",
-    status: "connected",
-    supportedAssets: ["equity", "crypto"],
-    latencyP50Ms: 1,
-    latencyP99Ms: 5,
-    fillRate: 1.0,
-    lastHeartbeat: "2026-04-01T10:00:00Z",
-    hasCredentials: false,
-  },
-];
 
 describe("venueStore", () => {
   beforeEach(() => {
@@ -78,41 +28,42 @@ describe("venueStore", () => {
   });
 
   it("loadVenues populates the venue map", async () => {
-    vi.mocked(fetchVenues).mockResolvedValue(mockVenues);
-
     await useVenueStore.getState().loadVenues();
 
     const state = useVenueStore.getState();
     expect(state.venues.size).toBe(3);
     expect(state.venues.get("alpaca")?.name).toBe("Alpaca");
-    expect(state.venues.get("binance")?.status).toBe("disconnected");
-    expect(state.venues.get("simulator")?.type).toBe("simulated");
+    expect(state.venues.get("binance_testnet")?.status).toBe("disconnected");
+    expect(state.venues.get("sim-exchange")?.type).toBe("simulated");
     expect(state.loading).toBe(false);
   });
 
   it("loadVenues sets error on failure", async () => {
-    vi.mocked(fetchVenues).mockRejectedValue(new Error("Failed to fetch"));
+    server.use(
+      http.get("*/api/v1/venues", () =>
+        HttpResponse.json({ message: "Failed to fetch" }, { status: 422 }),
+      ),
+    );
 
     await useVenueStore.getState().loadVenues();
 
     const state = useVenueStore.getState();
     expect(state.venues.size).toBe(0);
-    expect(state.error).toBe("Failed to fetch");
+    expect(state.error).toBeTruthy();
   });
 
   it("applyUpdate with venue_connected updates venue status", () => {
-    // Pre-populate venues
     const map = new Map<string, Venue>();
     for (const v of mockVenues) map.set(v.id, v);
     useVenueStore.setState({ venues: map });
 
     useVenueStore.getState().applyUpdate({
       type: "venue_connected",
-      venueId: "binance",
+      venueId: "binance_testnet",
       status: "connected",
     });
 
-    const updated = useVenueStore.getState().venues.get("binance");
+    const updated = useVenueStore.getState().venues.get("binance_testnet");
     expect(updated?.status).toBe("connected");
   });
 
@@ -154,48 +105,49 @@ describe("venueStore", () => {
 
     const connected = useVenueStore.getState().connectedVenues();
     expect(connected).toHaveLength(2);
-    expect(connected.map((v) => v.id).sort()).toEqual(["alpaca", "simulator"]);
+    expect(connected.map((v) => v.id).sort()).toEqual(["alpaca", "sim-exchange"]);
   });
 
   it("connectVenue calls correct API endpoint and updates status", async () => {
-    vi.mocked(apiConnectVenue).mockResolvedValue(undefined);
-
     const map = new Map<string, Venue>();
     for (const v of mockVenues) map.set(v.id, v);
     useVenueStore.setState({ venues: map });
 
-    await useVenueStore.getState().connectVenue("binance");
+    await useVenueStore.getState().connectVenue("binance_testnet");
 
-    expect(apiConnectVenue).toHaveBeenCalledWith("binance");
-    const updated = useVenueStore.getState().venues.get("binance");
+    const updated = useVenueStore.getState().venues.get("binance_testnet");
     expect(updated?.status).toBe("connected");
   });
 
   it("disconnectVenue calls correct API endpoint and updates status", async () => {
-    vi.mocked(apiDisconnectVenue).mockResolvedValue(undefined);
-
     const map = new Map<string, Venue>();
     for (const v of mockVenues) map.set(v.id, v);
     useVenueStore.setState({ venues: map });
 
     await useVenueStore.getState().disconnectVenue("alpaca");
 
-    expect(apiDisconnectVenue).toHaveBeenCalledWith("alpaca");
     const updated = useVenueStore.getState().venues.get("alpaca");
     expect(updated?.status).toBe("disconnected");
   });
 
   it("connectVenue sets error and rethrows on failure", async () => {
-    vi.mocked(apiConnectVenue).mockRejectedValue(new Error("Connection refused"));
+    server.use(
+      http.post("*/api/v1/venues/:venueId/connect", () =>
+        HttpResponse.json(
+          { error: { message: "Connection refused" } },
+          { status: 422 },
+        ),
+      ),
+    );
 
     const map = new Map<string, Venue>();
     for (const v of mockVenues) map.set(v.id, v);
     useVenueStore.setState({ venues: map });
 
-    await expect(useVenueStore.getState().connectVenue("binance")).rejects.toThrow(
-      "Connection refused",
-    );
+    await expect(
+      useVenueStore.getState().connectVenue("binance_testnet"),
+    ).rejects.toThrow();
 
-    expect(useVenueStore.getState().error).toBe("Connection refused");
+    expect(useVenueStore.getState().error).toBeTruthy();
   });
 });

@@ -1,0 +1,40 @@
+import type { Venue } from "../../api/types";
+
+export const mockVenues: Venue[] = [
+  {
+    id: "alpaca",
+    name: "Alpaca",
+    type: "exchange",
+    status: "connected",
+    supportedAssets: ["equity"],
+    latencyP50Ms: 45,
+    latencyP99Ms: 120,
+    fillRate: 0.98,
+    lastHeartbeat: "2026-04-01T10:00:00Z",
+    hasCredentials: true,
+  },
+  {
+    id: "binance_testnet",
+    name: "Binance Testnet",
+    type: "exchange",
+    status: "disconnected",
+    supportedAssets: ["crypto"],
+    latencyP50Ms: 30,
+    latencyP99Ms: 85,
+    fillRate: 0.99,
+    lastHeartbeat: "2026-04-01T09:55:00Z",
+    hasCredentials: true,
+  },
+  {
+    id: "sim-exchange",
+    name: "Simulated Exchange",
+    type: "simulated",
+    status: "connected",
+    supportedAssets: ["equity", "crypto"],
+    latencyP50Ms: 1,
+    latencyP99Ms: 5,
+    fillRate: 1.0,
+    lastHeartbeat: "2026-04-01T10:00:00Z",
+    hasCredentials: false,
+  },
+];

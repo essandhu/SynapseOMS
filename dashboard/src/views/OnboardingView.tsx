@@ -18,7 +18,7 @@ import { completeOnboarding } from "../api/rest";
 // ── Types ───────────────────────────────────────────────────────────────
 
 type Step = 1 | 2 | 3 | 4 | 5;
-type VenueChoice = "alpaca" | "binance_testnet" | "simulator" | null;
+type VenueChoice = "alpaca" | "binance_testnet" | "sim-exchange" | null;
 type PasswordStrength = "weak" | "medium" | "strong";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ const VENUE_OPTIONS: {
     icon: <Bitcoin className="h-6 w-6" />,
   },
   {
-    id: "simulator",
+    id: "sim-exchange",
     title: "Start with Simulator",
     subtitle: "No credentials needed",
     details: "Simulated fills \u00B7 Perfect for exploration",
@@ -142,7 +142,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
   const goBack = useCallback(() => {
     setStep((s) => {
       // If we're on step 5 and venue was simulator, go back to step 3
-      if (s === 5 && selectedVenue === "simulator") return 3 as Step;
+      if (s === 5 && selectedVenue === "sim-exchange") return 3 as Step;
       return Math.max(1, s - 1) as Step;
     });
   }, [selectedVenue]);
@@ -396,7 +396,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                     <span
                       className={[
                         "rounded-full px-2 py-0.5 font-mono text-[10px] font-medium",
-                        venue.id === "simulator"
+                        venue.id === "sim-exchange"
                           ? "bg-accent-green/10 text-accent-green"
                           : "bg-accent-yellow/10 text-accent-yellow",
                       ].join(" ")}
@@ -437,7 +437,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <button
             type="button"
             onClick={() => {
-              if (selectedVenue === "simulator") {
+              if (selectedVenue === "sim-exchange") {
                 setStep(5);
               } else if (selectedVenue) {
                 setStep(4);
@@ -446,7 +446,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
             disabled={!selectedVenue}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent-blue px-6 py-2.5 font-mono text-sm font-semibold text-white transition-all hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {selectedVenue === "simulator" ? "Skip to Finish" : "Continue"}
+            {selectedVenue === "sim-exchange" ? "Skip to Finish" : "Continue"}
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -476,7 +476,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
         </h1>
 
         <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-text-secondary">
-          {selectedVenue === "simulator"
+          {selectedVenue === "sim-exchange"
             ? "The simulator is ready. Place orders, test strategies, and explore the platform with zero risk."
             : "Your venue is connected and market data is flowing. You're ready to trade."}
         </p>
