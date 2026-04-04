@@ -4,9 +4,11 @@ build: ## Build gateway binary and dashboard
 	cd gateway && go build ./cmd/gateway
 	cd dashboard && npm run build
 
-test: ## Run gateway and dashboard test suites
+test: ## Run all test suites
 	cd gateway && go test ./...
 	cd dashboard && npm test
+	cd risk-engine && python -m pytest tests/ -q
+	cd ai && PYTHONPATH=. python -m pytest execution_analyst/tests/ rebalancing_assistant/tests/ smart_router_ml/tests/ -q
 
 lint: ## Run go vet and tsc --noEmit
 	cd gateway && go vet ./...

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-SynapseOMS is a self-hosted order management system for traders who work across equities and crypto. It consists of three services connected by Kafka and backed by PostgreSQL and Redis.
+SynapseOMS is a self-hosted order management system for traders who work across equities and crypto. It consists of four services connected by Kafka and backed by PostgreSQL and Redis.
 
 ## Service Topology
 
@@ -55,6 +55,13 @@ Trading terminal UI with real-time data.
 - **Liquidity Network**: Venue status cards, connect/disconnect venues
 - **AI Insights**: Execution reports, NL rebalancing chat, anomaly alerts
 
+### ML Scorer (Python) — Port 8090
+
+Venue scoring model for smart order routing.
+
+- **REST**: Venue scoring predictions (XGBoost) for fill probability, latency, and cost
+- **Stack**: FastAPI, XGBoost, scikit-learn
+
 ## Data Flow
 
 ### Order Submission
@@ -97,14 +104,14 @@ User enters credentials (Dashboard)
 | Messaging | Apache Kafka 3.7 (KRaft mode) |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
-| AI | Anthropic Claude API, XGBoost |
+| AI / ML Scorer | Anthropic Claude API, XGBoost, scikit-learn (FastAPI service on port 8090) |
 | Monitoring | Prometheus, Grafana |
 | Containers | Docker Compose, Kubernetes manifests |
 
 ## Key Design Decisions
 
 - **Self-hosted**: All data stays on the user's machine. Credentials are encrypted at rest with a user-chosen passphrase.
-- **Adapter pattern**: New exchanges are added by implementing one Go interface (14 methods). See [Write a Venue Adapter](write-adapter.md).
+- **Adapter pattern**: New exchanges are added by implementing one Go interface (16 methods). See [Write a Venue Adapter](write-adapter.md).
 - **Fail-open risk**: If the risk engine is unavailable, orders proceed with a warning log rather than blocking all trading.
 - **Event sourcing via Kafka**: Order lifecycle events flow through Kafka, enabling the risk engine to maintain an independent portfolio view. The gateway publishes structured JSON event envelopes (`order_created`, `fill_received`, `order_filled`, etc.) to the `order-lifecycle` topic. The risk engine consumes these to update portfolio cash, positions, and NAV.
 - **Pure Go Kafka client**: The gateway uses `segmentio/kafka-go` (pure Go, no CGO/librdkafka dependency) for cross-platform builds without a C toolchain.

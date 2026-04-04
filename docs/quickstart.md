@@ -13,8 +13,8 @@ Get SynapseOMS running on your machine in about 3 minutes.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-org/synapse-oms.git
-cd synapse-oms
+git clone https://github.com/essandhu/SynapseOMS.git
+cd SynapseOMS
 ```
 
 ### 2. Configure environment

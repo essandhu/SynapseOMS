@@ -15,8 +15,8 @@ Thanks for your interest in contributing. This document covers how to set up you
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/synapse-oms.git
-cd synapse-oms
+git clone https://github.com/essandhu/SynapseOMS.git
+cd SynapseOMS
 
 # Start infrastructure services
 cp deploy/.env.example deploy/.env
@@ -121,7 +121,7 @@ scope: gateway, risk-engine, dashboard, ai, deploy, docs
 The highest-impact contribution is adding support for new exchanges. See [docs/write-adapter.md](docs/write-adapter.md) for a step-by-step guide.
 
 Each adapter:
-- Implements the `LiquidityProvider` interface (14 methods)
+- Implements the `LiquidityProvider` interface (16 methods)
 - Passes the shared contract test suite
 - Includes venue-specific unit tests
 
