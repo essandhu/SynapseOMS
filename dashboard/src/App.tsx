@@ -26,9 +26,10 @@ function AppRoutes() {
           setNeedsOnboarding(!completed);
         }
       } catch {
-        // If the API is unreachable, assume first run
+        // API unreachable — skip onboarding rather than trapping the user
+        // in the onboarding flow when the gateway is temporarily down.
         if (!cancelled) {
-          setNeedsOnboarding(true);
+          setNeedsOnboarding(false);
         }
       } finally {
         if (!cancelled) {
