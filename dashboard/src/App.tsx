@@ -11,6 +11,9 @@ import { OnboardingView } from "./views/OnboardingView";
 import { fetchOnboardingStatus } from "./api/rest";
 import { initializeStreams } from "./api/ws";
 import { useInsightStore } from "./stores/insightStore";
+import { useOrderStore } from "./stores/orderStore";
+import { usePositionStore } from "./stores/positionStore";
+import { useVenueStore } from "./stores/venueStore";
 
 function AppRoutes() {
   const [checking, setChecking] = useState(true);
@@ -80,16 +83,23 @@ function AppRoutes() {
 
 export function App() {
   const { applyAnomalyAlert } = useInsightStore();
+  const orderApplyUpdate = useOrderStore((s) => s.applyUpdate);
+  const orderLoadOrders = useOrderStore((s) => s.loadOrders);
+  const positionApplyUpdate = usePositionStore((s) => s.applyUpdate);
+  const venueApplyUpdate = useVenueStore((s) => s.applyUpdate);
 
   useEffect(() => {
+    // Load initial orders at app level so they persist across view transitions
+    orderLoadOrders();
+
     const cleanup = initializeStreams({
-      onOrderUpdate: () => {},
-      onPositionUpdate: () => {},
-      onVenueUpdate: () => {},
+      onOrderUpdate: (update) => orderApplyUpdate(update),
+      onPositionUpdate: (update) => positionApplyUpdate(update),
+      onVenueUpdate: (update) => venueApplyUpdate(update),
       onAnomalyAlert: applyAnomalyAlert,
     });
     return cleanup;
-  }, [applyAnomalyAlert]);
+  }, [applyAnomalyAlert, orderApplyUpdate, orderLoadOrders, positionApplyUpdate, venueApplyUpdate]);
 
   return (
     <BrowserRouter>

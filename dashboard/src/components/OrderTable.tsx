@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, ClientSideRowModelModule } from "ag-grid-community";
-import type { ColDef, ICellRendererParams, GridReadyEvent, GridApi, CellStyle } from "ag-grid-community";
+import type { ColDef, ICellRendererParams, GridReadyEvent, GridSizeChangedEvent, ColumnResizedEvent, GridApi, CellStyle } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import type { Order, OrderStatus } from "../api/types";
@@ -62,20 +62,15 @@ function formatTime(iso: string): string {
   }
 }
 
-export function OrderTable({ orders, onCancel }: OrderTableProps) {
-  const gridRef = useRef<AgGridReact<Order>>(null);
-  const gridApiRef = useRef<GridApi<Order> | null>(null);
-
-  const onGridReady = useCallback((params: GridReadyEvent<Order>) => {
-    gridApiRef.current = params.api;
-    params.api.sizeColumnsToFit();
-  }, []);
-
-  const columnDefs = useMemo(
-    (): ColDef<Order>[] => [
+/** Build column definitions for the order blotter grid. Exported for testing. */
+export function buildColumnDefs(
+  onCancel: (orderId: string) => void,
+): ColDef<Order>[] {
+  return [
       {
         headerName: "Time",
         field: "createdAt",
+        minWidth: 90,
         width: 100,
         valueFormatter: (p) => (p.value ? formatTime(p.value) : ""),
         sort: "desc" as const,
@@ -83,12 +78,14 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Instrument",
         field: "instrumentId",
+        minWidth: 100,
         width: 140,
         cellStyle: { color: terminalTheme.colors.text.primary, fontWeight: "600" },
       },
       {
         headerName: "Side",
         field: "side",
+        minWidth: 60,
         width: 70,
         cellRenderer: (params: ICellRendererParams<Order>) => {
           if (!params.value) return null;
@@ -111,6 +108,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Type",
         field: "type",
+        minWidth: 75,
         width: 80,
         valueFormatter: (p) => {
           if (!p.value) return "";
@@ -122,6 +120,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Qty",
         field: "quantity",
+        minWidth: 80,
         width: 90,
         type: "rightAligned",
         valueFormatter: (p) => (p.value ? formatDecimal(p.value, 4) : ""),
@@ -129,6 +128,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Price",
         field: "price",
+        minWidth: 80,
         width: 100,
         type: "rightAligned",
         cellRenderer: (params: ICellRendererParams<Order>) => {
@@ -146,6 +146,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Filled",
         field: "filledQuantity",
+        minWidth: 80,
         width: 90,
         type: "rightAligned",
         valueFormatter: (p) => (p.value ? formatDecimal(p.value, 4) : ""),
@@ -153,6 +154,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Avg Price",
         field: "averagePrice",
+        minWidth: 80,
         width: 100,
         type: "rightAligned",
         valueFormatter: (p) => {
@@ -163,6 +165,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Status",
         field: "status",
+        minWidth: 85,
         width: 100,
         cellRenderer: (params: ICellRendererParams<Order>) => {
           if (!params.value) return null;
@@ -187,15 +190,20 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       {
         headerName: "Venue",
         field: "venueId",
-        width: 110,
+        minWidth: 80,
+        flex: 1,
         cellStyle: { color: terminalTheme.colors.text.secondary },
       },
       {
-        headerName: "",
+        headerName: "Action",
         field: "id",
         width: 80,
+        maxWidth: 80,
+        minWidth: 80,
         sortable: false,
+        resizable: false,
         filter: false,
+        suppressSizeToFit: true,
         cellRenderer: (params: ICellRendererParams<Order>) => {
           if (!params.data || TERMINAL_STATUSES.has(params.data.status)) {
             return null;
@@ -205,21 +213,18 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
               onClick={() => onCancel(params.data!.id)}
               style={{
                 background: "transparent",
-                border: `1px solid ${terminalTheme.colors.border}`,
+                border: "none",
                 color: terminalTheme.colors.text.muted,
-                padding: "2px 8px",
-                borderRadius: "4px",
+                padding: "0",
                 cursor: "pointer",
                 fontSize: "11px",
                 fontFamily: terminalTheme.fonts.mono,
-                transition: "all 0.15s",
+                transition: "color 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = terminalTheme.colors.accent.red;
                 e.currentTarget.style.color = terminalTheme.colors.accent.red;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = terminalTheme.colors.border;
                 e.currentTarget.style.color = terminalTheme.colors.text.muted;
               }}
             >
@@ -228,7 +233,30 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
           );
         },
       },
-    ],
+  ];
+}
+
+export function OrderTable({ orders, onCancel }: OrderTableProps) {
+  const gridRef = useRef<AgGridReact<Order>>(null);
+  const gridApiRef = useRef<GridApi<Order> | null>(null);
+
+  const onGridReady = useCallback((params: GridReadyEvent<Order>) => {
+    gridApiRef.current = params.api;
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onGridSizeChanged = useCallback((params: GridSizeChangedEvent<Order>) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onColumnResized = useCallback((params: ColumnResizedEvent<Order>) => {
+    if (params.finished && params.source === "uiColumnResized") {
+      params.api.sizeColumnsToFit();
+    }
+  }, []);
+
+  const columnDefs = useMemo(
+    () => buildColumnDefs(onCancel),
     [onCancel],
   );
 
@@ -241,8 +269,6 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
         fontFamily: terminalTheme.fonts.mono,
         fontSize: "12px",
         color: terminalTheme.colors.text.secondary,
-        display: "flex",
-        alignItems: "center",
       },
     }),
     [],
@@ -280,9 +306,10 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
         defaultColDef={defaultColDef}
         getRowId={getRowId}
         onGridReady={onGridReady}
+        onGridSizeChanged={onGridSizeChanged}
+        onColumnResized={onColumnResized}
         animateRows={true}
         suppressCellFocus={true}
-        domLayout="autoHeight"
         noRowsOverlayComponent={() => (
           <div
             style={{

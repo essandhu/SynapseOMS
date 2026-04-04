@@ -5,7 +5,6 @@ import { BlotterView } from "./BlotterView";
 import type { Order, Instrument } from "../api/types";
 
 // Mock the order store
-const mockSubscribe = vi.fn(() => vi.fn());
 const mockSubmitOrder = vi.fn();
 const mockCancelOrder = vi.fn().mockResolvedValue(undefined);
 
@@ -19,7 +18,6 @@ vi.mock("../stores/orderStore", () => ({
       orders: mockOrders,
       loading: mockLoading,
       error: mockError,
-      subscribe: mockSubscribe,
       submitOrder: mockSubmitOrder,
       cancelOrder: mockCancelOrder,
     };
@@ -73,7 +71,7 @@ vi.mock("../stores/marketDataStore", () => ({
 describe("BlotterView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOrders = new Map();
+    mockOrders = new Map<string, Order>();
     mockLoading = false;
     mockError = null;
   });
@@ -103,12 +101,6 @@ describe("BlotterView", () => {
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText("Filled")).toBeInTheDocument();
     expect(screen.getByText("Canceled")).toBeInTheDocument();
-  });
-
-  it("subscribes to order store on mount", () => {
-    render(<BlotterView />);
-
-    expect(mockSubscribe).toHaveBeenCalledOnce();
   });
 
   it("displays error banner when error exists", () => {

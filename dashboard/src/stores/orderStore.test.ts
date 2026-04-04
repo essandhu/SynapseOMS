@@ -42,6 +42,37 @@ describe("orderStore", () => {
     expect(state.error).toBeNull();
   });
 
+  it("loadOrders merges with existing orders instead of replacing", async () => {
+    // Pre-populate a WebSocket-delivered order that the API won't return
+    const wsOrder = makeOrder({ id: "ws-only", status: "acknowledged", instrumentId: "NVDA" });
+    const map = new Map<string, Order>();
+    map.set(wsOrder.id, wsOrder);
+    useOrderStore.setState({ orders: map });
+
+    // loadOrders fetches the standard 5 mock orders from MSW
+    await useOrderStore.getState().loadOrders();
+
+    const state = useOrderStore.getState();
+    // Should have 5 API orders + 1 WebSocket-only order = 6
+    expect(state.orders.size).toBe(6);
+    expect(state.orders.get("ws-only")?.instrumentId).toBe("NVDA");
+    expect(state.orders.get("order-1")?.status).toBe("new");
+  });
+
+  it("loadOrders API data takes precedence over stale store data", async () => {
+    // Pre-populate with a stale version of an order that the API will also return
+    const staleOrder = makeOrder({ id: "order-1", status: "acknowledged" });
+    const map = new Map<string, Order>();
+    map.set(staleOrder.id, staleOrder);
+    useOrderStore.setState({ orders: map });
+
+    await useOrderStore.getState().loadOrders();
+
+    const state = useOrderStore.getState();
+    // API returns order-1 with status "new" — should overwrite the stale "acknowledged"
+    expect(state.orders.get("order-1")?.status).toBe("new");
+  });
+
   it("loadOrders sets error on failure", async () => {
     server.use(
       http.get("*/api/v1/orders", () =>

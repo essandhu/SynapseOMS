@@ -49,7 +49,7 @@ Portfolio analytics, risk management, and AI features.
 
 Trading terminal UI with real-time data.
 
-- **Order Blotter**: AG Grid with streaming updates, order ticket panel
+- **Order Blotter**: AG Grid with streaming updates (WebSocket subscription at App level), order ticket panel, scrollable with responsive column sizing
 - **Portfolio View**: Positions, NAV, exposure breakdown
 - **Risk Dashboard**: VaR gauges, Monte Carlo histogram, Greeks heatmap, concentration treemap, drawdown chart
 - **Liquidity Network**: Venue status cards, connect/disconnect venues

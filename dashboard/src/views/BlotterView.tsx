@@ -24,7 +24,6 @@ export function BlotterView() {
   const orders = useOrderStore((s) => s.orders);
   const loading = useOrderStore((s) => s.loading);
   const error = useOrderStore((s) => s.error);
-  const subscribe = useOrderStore((s) => s.subscribe);
   const submitOrder = useOrderStore((s) => s.submitOrder);
   const cancelOrder = useOrderStore((s) => s.cancelOrder);
 
@@ -43,12 +42,6 @@ export function BlotterView() {
   const [chartInstrument, setChartInstrument] = useState("AAPL");
   const [chartInterval, setChartInterval] = useState<"1m" | "5m">("1m");
   const subscribeMarketData = useMarketDataStore((s) => s.subscribe);
-
-  // Subscribe to WebSocket and load initial orders
-  useEffect(() => {
-    const unsubscribe = subscribe();
-    return unsubscribe;
-  }, [subscribe]);
 
   // Subscribe to market data WebSocket when chart is open
   useEffect(() => {

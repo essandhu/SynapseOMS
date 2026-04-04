@@ -92,11 +92,18 @@ export const useOrderStore = create<OrderStoreState>()((set, get) => ({
     set({ loading: true, error: null });
     try {
       const orders = await fetchOrders();
-      const map = new Map<string, Order>();
-      for (const order of orders) {
-        map.set(order.id, order);
-      }
-      set({ orders: map, loading: false });
+      set((state) => {
+        // Merge API orders with existing store orders so WebSocket-delivered
+        // updates that arrived before the REST response are not clobbered.
+        // API data is authoritative — use it as the base, then overlay any
+        // orders already in the store that the API didn't return (e.g.
+        // orders received via WebSocket between the fetch start and now).
+        const next = new Map<string, Order>(state.orders);
+        for (const order of orders) {
+          next.set(order.id, order);
+        }
+        return { orders: next, loading: false };
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load orders";
       set({ loading: false, error: message });
