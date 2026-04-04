@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	kafkago "github.com/segmentio/kafka-go"
 
 	"github.com/synapse-oms/gateway/internal/logging"
 )
@@ -64,38 +64,26 @@ func (ac *AnomalyConsumer) Stop() {
 }
 
 func (ac *AnomalyConsumer) consumeLoop(ctx context.Context) {
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": ac.brokers,
-		"group.id":          "gateway-anomaly-relay",
-		"auto.offset.reset": "latest",
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:  []string{ac.brokers},
+		Topic:    TopicAnomalyAlerts,
+		GroupID:  "gateway-anomaly-relay",
+		MaxWait:  time.Second,
+		MinBytes: 1,
+		MaxBytes: 10e6, // 10MB
 	})
-	if err != nil {
-		ac.logger.Error("failed to create anomaly consumer",
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-	defer consumer.Close()
-
-	if err := consumer.Subscribe(TopicAnomalyAlerts, nil); err != nil {
-		ac.logger.Error("failed to subscribe to anomaly-alerts",
-			slog.String("error", err.Error()),
-		)
-		return
-	}
+	defer reader.Close()
 
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			msg, err := consumer.ReadMessage(time.Second)
-			if err != nil {
-				// timeout or transient error — keep polling
-				continue
+		msg, err := reader.ReadMessage(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return // context cancelled — clean shutdown
 			}
-			ac.processMessage(msg.Value)
+			// transient error — keep polling
+			continue
 		}
+		ac.processMessage(msg.Value)
 	}
 }
 

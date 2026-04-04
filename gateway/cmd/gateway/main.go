@@ -44,7 +44,7 @@ func main() {
 	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("POSTGRES_URL", "postgres://localhost:5432/synapse")
 	viper.SetDefault("REDIS_URL", "redis://localhost:6379")
-	viper.SetDefault("KAFKA_BROKERS", "")
+	viper.SetDefault("KAFKA_BROKERS", "localhost:9092")
 	viper.SetDefault("RISK_ENGINE_GRPC", "")
 	viper.SetDefault("SYNAPSE_MASTER_PASSPHRASE", "")
 	viper.SetDefault("ML_SCORER_URL", "http://localhost:8090")
@@ -206,13 +206,15 @@ func main() {
 		kafkaLogger := logging.New(os.Stdout, "gateway", "kafka")
 		kp, err := kafka.NewProducer(kafkaBrokers, kafkaLogger)
 		if err != nil {
-			logger.Error("failed to create Kafka producer", slog.String("error", err.Error()))
-			os.Exit(1)
+			logger.Warn("failed to create Kafka producer — running without event publishing",
+				slog.String("error", err.Error()),
+			)
+		} else {
+			kafkaProducer = kp
+			defer kafkaProducer.Close()
+			pipelineOpts = append(pipelineOpts, pipeline.WithKafkaPublisher(kafkaProducer))
+			logger.Info("Kafka producer initialized", slog.String("brokers", kafkaBrokers))
 		}
-		kafkaProducer = kp
-		defer kafkaProducer.Close()
-		pipelineOpts = append(pipelineOpts, pipeline.WithKafkaPublisher(kafkaProducer))
-		logger.Info("Kafka producer initialized")
 	} else {
 		logger.Info("KAFKA_BROKERS not set, running without Kafka")
 	}

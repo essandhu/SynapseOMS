@@ -16,6 +16,7 @@ func TestTopicConstants(t *testing.T) {
 		{"OrderLifecycle", TopicOrderLifecycle, "order-lifecycle"},
 		{"MarketData", TopicMarketData, "market-data"},
 		{"VenueStatus", TopicVenueStatus, "venue-status"},
+		{"AnomalyAlerts", TopicAnomalyAlerts, "anomaly-alerts"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -53,5 +54,12 @@ func TestBuildHeaders_EmptyCorrelationID(t *testing.T) {
 	headers := buildHeaders(ctx)
 	if len(headers) != 0 {
 		t.Errorf("expected 0 headers for empty correlation ID, got %d", len(headers))
+	}
+}
+
+func TestNewProducer_EmptyBrokers(t *testing.T) {
+	_, err := NewProducer("", nil)
+	if err == nil {
+		t.Error("expected error for empty brokers")
 	}
 }

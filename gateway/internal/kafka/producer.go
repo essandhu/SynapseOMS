@@ -1,13 +1,14 @@
-// Package kafka provides a thin wrapper around confluent-kafka-go for publishing
-// order-lifecycle, market-data, and venue-status events as serialized protobuf payloads.
+// Package kafka provides a thin wrapper around segmentio/kafka-go for publishing
+// order-lifecycle, market-data, and venue-status events.
 package kafka
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	kafkago "github.com/segmentio/kafka-go"
 
 	"github.com/synapse-oms/gateway/internal/logging"
 )
@@ -23,37 +24,46 @@ const (
 // Header key used to propagate correlation IDs across Kafka messages.
 const headerCorrelationID = "correlation-id"
 
-// Producer wraps a confluent-kafka-go producer with typed publish helpers
+// Producer wraps a segmentio/kafka-go writer with typed publish helpers
 // for each SynapseOMS event stream.
 type Producer struct {
-	producer *kafka.Producer
-	logger   *slog.Logger
-	doneCh   chan struct{}
+	writers map[string]*kafkago.Writer
+	logger  *slog.Logger
 }
 
 // NewProducer creates a Kafka producer connected to the given broker list
-// (comma-separated). It starts an internal goroutine for delivery reports.
+// (comma-separated). It creates one Writer per topic for optimal batching.
 func NewProducer(brokers string, logger *slog.Logger) (*Producer, error) {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": brokers,
-		"acks":              "all",
-		"retries":           3,
-		"retry.backoff.ms":  100,
-		"linger.ms":         5,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create kafka producer: %w", err)
+	if brokers == "" {
+		return nil, fmt.Errorf("kafka brokers must not be empty")
 	}
 
-	kp := &Producer{
-		producer: p,
-		logger:   logger,
-		doneCh:   make(chan struct{}),
+	topics := []string{TopicOrderLifecycle, TopicMarketData, TopicVenueStatus}
+	writers := make(map[string]*kafkago.Writer, len(topics))
+
+	// Ensure topics exist before writing. This is a best-effort operation;
+	// if the broker is unreachable or doesn't allow auto-creation, writers
+	// will still attempt to create topics via AllowAutoTopicCreation.
+	ensureTopics(brokers, topics, logger)
+
+	for _, topic := range topics {
+		writers[topic] = &kafkago.Writer{
+			Addr:                   kafkago.TCP(brokers),
+			Topic:                  topic,
+			Balancer:               &kafkago.Hash{},
+			BatchTimeout:           5 * time.Millisecond,
+			RequiredAcks:           kafkago.RequireAll,
+			MaxAttempts:            3,
+			AllowAutoTopicCreation: true,
+			Logger:                 kafkago.LoggerFunc(func(msg string, args ...interface{}) { logger.Debug(msg) }),
+			ErrorLogger:            kafkago.LoggerFunc(func(msg string, args ...interface{}) { logger.Error(msg) }),
+		}
 	}
 
-	go kp.deliveryReportHandler()
-
-	return kp, nil
+	return &Producer{
+		writers: writers,
+		logger:  logger,
+	}, nil
 }
 
 // PublishOrderLifecycle publishes a serialized OrderLifecycleEvent to the
@@ -75,69 +85,115 @@ func (p *Producer) PublishVenueStatus(ctx context.Context, venueID string, paylo
 	return p.publish(ctx, TopicVenueStatus, venueID, payload)
 }
 
-// Close flushes any pending messages (up to 10 s) and shuts down the producer.
+// Close flushes any pending messages and shuts down all writers.
 func (p *Producer) Close() {
-	p.producer.Flush(10000)
-	p.producer.Close()
-	close(p.doneCh)
+	for topic, w := range p.writers {
+		if err := w.Close(); err != nil {
+			p.logger.Error("failed to close kafka writer",
+				slog.String("topic", topic),
+				slog.String("error", err.Error()),
+			)
+		}
+	}
 }
 
+// writeTimeout limits how long a publish can block when Kafka is unreachable,
+// preventing the fill pipeline from stalling.
+const writeTimeout = 5 * time.Second
+
 // publish is the shared implementation for all topic-specific publish methods.
+// It uses a timeout context so that Kafka unavailability doesn't block the
+// order processing pipeline.
 func (p *Producer) publish(ctx context.Context, topic, key string, payload []byte) error {
+	w, ok := p.writers[topic]
+	if !ok {
+		return fmt.Errorf("no writer for topic %s", topic)
+	}
+
 	headers := buildHeaders(ctx)
 
-	msg := &kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     &topic,
-			Partition: kafka.PartitionAny,
-		},
+	msg := kafkago.Message{
 		Key:     []byte(key),
 		Value:   payload,
 		Headers: headers,
 	}
 
-	if err := p.producer.Produce(msg, nil); err != nil {
+	writeCtx, cancel := context.WithTimeout(ctx, writeTimeout)
+	defer cancel()
+
+	if err := w.WriteMessages(writeCtx, msg); err != nil {
 		return fmt.Errorf("produce to %s: %w", topic, err)
 	}
+
+	p.logger.Info("kafka message delivered",
+		slog.String("topic", topic),
+		slog.String("key", key),
+		slog.Int("bytes", len(payload)),
+	)
 
 	return nil
 }
 
+// ensureTopics creates Kafka topics if they don't already exist.
+// This is best-effort — failures are logged but don't prevent startup.
+func ensureTopics(brokers string, topics []string, logger *slog.Logger) {
+	conn, err := kafkago.Dial("tcp", brokers)
+	if err != nil {
+		logger.Warn("failed to connect to Kafka for topic creation",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	defer conn.Close()
+
+	controller, err := conn.Controller()
+	if err != nil {
+		logger.Warn("failed to get Kafka controller",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	controllerConn, err := kafkago.Dial("tcp", fmt.Sprintf("%s:%d", controller.Host, controller.Port))
+	if err != nil {
+		logger.Warn("failed to connect to Kafka controller",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	defer controllerConn.Close()
+
+	topicConfigs := make([]kafkago.TopicConfig, len(topics))
+	for i, t := range topics {
+		topicConfigs[i] = kafkago.TopicConfig{
+			Topic:             t,
+			NumPartitions:     3,
+			ReplicationFactor: 1,
+		}
+	}
+
+	if err := controllerConn.CreateTopics(topicConfigs...); err != nil {
+		logger.Warn("failed to create Kafka topics (may already exist)",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	for _, t := range topics {
+		logger.Info("Kafka topic ensured", slog.String("topic", t))
+	}
+}
+
 // buildHeaders extracts known context values (correlation ID) and returns
 // them as Kafka message headers.
-func buildHeaders(ctx context.Context) []kafka.Header {
-	var headers []kafka.Header
+func buildHeaders(ctx context.Context) []kafkago.Header {
+	var headers []kafkago.Header
 
 	if corrID := logging.CorrelationIDFromContext(ctx); corrID != "" {
-		headers = append(headers, kafka.Header{
+		headers = append(headers, kafkago.Header{
 			Key:   headerCorrelationID,
 			Value: []byte(corrID),
 		})
 	}
 
 	return headers
-}
-
-// deliveryReportHandler consumes the producer's Events channel and logs
-// delivery successes and failures. It runs until the channel is closed
-// (which happens when the underlying producer is closed).
-func (p *Producer) deliveryReportHandler() {
-	for e := range p.producer.Events() {
-		switch ev := e.(type) {
-		case *kafka.Message:
-			if ev.TopicPartition.Error != nil {
-				p.logger.Error("delivery failed",
-					slog.String("topic", *ev.TopicPartition.Topic),
-					slog.String("key", string(ev.Key)),
-					slog.String("error", ev.TopicPartition.Error.Error()),
-				)
-			} else {
-				p.logger.Debug("message delivered",
-					slog.String("topic", *ev.TopicPartition.Topic),
-					slog.Int64("offset", int64(ev.TopicPartition.Offset)),
-					slog.Int("partition", int(ev.TopicPartition.Partition)),
-				)
-			}
-		}
-	}
 }
