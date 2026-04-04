@@ -31,6 +31,14 @@ func contractSuite(t *testing.T, provider adapter.LiquidityProvider) {
 		}
 	})
 
+	t.Run("VenueType returns valid type", func(t *testing.T) {
+		vt := provider.VenueType()
+		valid := map[string]bool{"exchange": true, "simulated": true, "tokenized": true, "dark_pool": true}
+		if !valid[vt] {
+			t.Errorf("VenueType() = %q, not a recognized venue type", vt)
+		}
+	})
+
 	t.Run("Status returns Disconnected before Connect", func(t *testing.T) {
 		status := provider.Status()
 		if status != adapter.Disconnected {

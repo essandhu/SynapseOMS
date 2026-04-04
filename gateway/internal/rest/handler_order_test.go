@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/synapse-oms/gateway/internal/adapter"
 	"github.com/synapse-oms/gateway/internal/domain"
 	"github.com/synapse-oms/gateway/internal/rest"
 	"github.com/synapse-oms/gateway/internal/store"
@@ -145,9 +146,19 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func TestSubmitOrder_Success(t *testing.T) {
+	// Register a connected venue that supports equity so the venue check passes.
+	venueID := "test-order-venue-01"
+	mlp := &mockLiquidityProvider{
+		venueID:      venueID,
+		venueName:    "Order Test Exchange",
+		status:       adapter.Connected,
+		assetClasses: []domain.AssetClass{domain.AssetClassEquity},
+	}
+	adapter.RegisterInstance(venueID, mlp)
+
 	ms := &mockStore{
 		instruments: []domain.Instrument{
-			{ID: "AAPL", Symbol: "AAPL", Name: "Apple Inc"},
+			{ID: "AAPL", Symbol: "AAPL", Name: "Apple Inc", AssetClass: domain.AssetClassEquity},
 		},
 	}
 	mp := &mockPipeline{}

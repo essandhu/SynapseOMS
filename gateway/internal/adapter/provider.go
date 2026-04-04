@@ -65,6 +65,7 @@ type MarketDataSnapshot struct {
 type LiquidityProvider interface {
 	VenueID() string
 	VenueName() string
+	VenueType() string
 	SupportedAssetClasses() []domain.AssetClass
 	SupportedInstruments() ([]domain.Instrument, error)
 	Connect(ctx context.Context, cred domain.VenueCredential) error

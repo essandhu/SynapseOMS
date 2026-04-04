@@ -65,8 +65,9 @@ func NewAdapter(config map[string]string) adapter.LiquidityProvider {
 	}
 }
 
-func (a *Adapter) VenueID() string  { return venueID }
-func (a *Adapter) VenueName() string { return venueName }
+func (a *Adapter) VenueID() string   { return venueID }
+func (a *Adapter) VenueName() string  { return venueName }
+func (a *Adapter) VenueType() string  { return "exchange" }
 
 func (a *Adapter) SupportedAssetClasses() []domain.AssetClass {
 	return []domain.AssetClass{domain.AssetClassEquity}

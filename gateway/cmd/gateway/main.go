@@ -536,7 +536,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated", "alpaca"},
+			Venues: []string{"sim-exchange", "alpaca"},
 		},
 		{
 			ID:              "MSFT",
@@ -554,7 +554,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated", "alpaca"},
+			Venues: []string{"sim-exchange", "alpaca"},
 		},
 		{
 			ID:              "GOOG",
@@ -572,7 +572,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 				AfterHours:  "20:00",
 				Timezone:    "America/New_York",
 			},
-			Venues: []string{"simulated", "alpaca"},
+			Venues: []string{"sim-exchange", "alpaca"},
 		},
 		{
 			ID:              "BTC-USD",
@@ -584,7 +584,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.00001),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated", "binance_testnet"},
+			Venues:          []string{"sim-exchange", "binance_testnet"},
 		},
 		{
 			ID:              "ETH-USD",
@@ -596,7 +596,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.0001),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated", "binance_testnet"},
+			Venues:          []string{"sim-exchange", "binance_testnet"},
 		},
 		{
 			ID:              "SOL-USD",
@@ -608,7 +608,7 @@ func seedInstruments(ctx context.Context, s *store.PostgresStore, logger *slog.L
 			LotSize:         decimal.NewFromFloat(0.01),
 			SettlementCycle: domain.SettlementT0,
 			TradingHours:    domain.TradingSchedule{Is24x7: true},
-			Venues:          []string{"simulated", "binance_testnet"},
+			Venues:          []string{"sim-exchange", "binance_testnet"},
 		},
 	}
 

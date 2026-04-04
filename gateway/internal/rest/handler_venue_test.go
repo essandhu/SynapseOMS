@@ -18,17 +18,28 @@ import (
 // --- mock liquidity provider ---
 
 type mockLiquidityProvider struct {
-	venueID    string
-	venueName  string
-	status     adapter.VenueStatus
-	connectFn  func(ctx context.Context, cred domain.VenueCredential) error
-	disconnFn  func(ctx context.Context) error
-	pingFn     func(ctx context.Context) (time.Duration, error)
+	venueID     string
+	venueName   string
+	venueType   string
+	status      adapter.VenueStatus
+	assetClasses []domain.AssetClass
+	connectFn   func(ctx context.Context, cred domain.VenueCredential) error
+	disconnFn   func(ctx context.Context) error
+	pingFn      func(ctx context.Context) (time.Duration, error)
 }
 
 func (m *mockLiquidityProvider) VenueID() string  { return m.venueID }
 func (m *mockLiquidityProvider) VenueName() string { return m.venueName }
+func (m *mockLiquidityProvider) VenueType() string {
+	if m.venueType != "" {
+		return m.venueType
+	}
+	return "exchange"
+}
 func (m *mockLiquidityProvider) SupportedAssetClasses() []domain.AssetClass {
+	if len(m.assetClasses) > 0 {
+		return m.assetClasses
+	}
 	return []domain.AssetClass{domain.AssetClassCrypto}
 }
 func (m *mockLiquidityProvider) SupportedInstruments() ([]domain.Instrument, error) {
@@ -70,8 +81,9 @@ func (m *mockLiquidityProvider) UnsubscribeMarketData(_ context.Context, _ []str
 }
 func (m *mockLiquidityProvider) FillFeed() <-chan domain.Fill { return nil }
 func (m *mockLiquidityProvider) Capabilities() adapter.VenueCapabilities {
+	classes := m.SupportedAssetClasses()
 	return adapter.VenueCapabilities{
-		SupportedAssetClasses: []domain.AssetClass{domain.AssetClassCrypto},
+		SupportedAssetClasses: classes,
 		SupportsStreaming:     true,
 		MaxOrdersPerSecond:    100,
 	}

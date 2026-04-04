@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/synapse-oms/gateway/internal/adapter"
@@ -56,7 +57,10 @@ type venueResponse struct {
 	Status          string   `json:"status"`
 	SupportedAssets []string `json:"supportedAssets"`
 	HasCredentials  bool     `json:"hasCredentials"`
-	LatencyMs       int64    `json:"latencyMs"`
+	LatencyP50Ms    int64    `json:"latencyP50Ms"`
+	LatencyP99Ms    int64    `json:"latencyP99Ms"`
+	FillRate        float64  `json:"fillRate"`
+	LastHeartbeat   string   `json:"lastHeartbeat"`
 }
 
 // listVenues handles GET /api/v1/venues.
@@ -74,11 +78,29 @@ func (h *VenueHandler) listVenues(w http.ResponseWriter, r *http.Request) {
 			hasCred = false
 		}
 
-		var latencyMs int64
+		var latencyP50Ms int64
+		var lastHeartbeat string
 		if p.Status() == adapter.Connected {
 			latency, err := p.Ping(r.Context())
 			if err == nil {
-				latencyMs = latency.Milliseconds()
+				latencyP50Ms = latency.Milliseconds()
+			}
+			lastHeartbeat = time.Now().UTC().Format(time.RFC3339)
+		}
+
+		// Estimate P99 as ~3x P50 when no histogram data is available.
+		var latencyP99Ms int64
+		if latencyP50Ms > 0 {
+			latencyP99Ms = latencyP50Ms * 3
+		}
+
+		// Default fill rate: 1.0 for simulated venues (deterministic fills),
+		// 0 for disconnected venues (no data).
+		var fillRate float64
+		if p.Status() == adapter.Connected {
+			fillRate = 1.0
+			if p.VenueType() != "simulated" {
+				fillRate = 0.95 // default for real exchanges until metric aggregation is implemented
 			}
 		}
 
@@ -87,23 +109,17 @@ func (h *VenueHandler) listVenues(w http.ResponseWriter, r *http.Request) {
 			assets = append(assets, assetClassToString(ac))
 		}
 
-		venueType := "exchange"
-		caps := p.Capabilities()
-		if len(caps.SupportedAssetClasses) > 0 {
-			first := caps.SupportedAssetClasses[0]
-			if first == domain.AssetClassCrypto {
-				venueType = "crypto_exchange"
-			}
-		}
-
 		result = append(result, venueResponse{
 			ID:              p.VenueID(),
 			Name:            p.VenueName(),
-			Type:            venueType,
+			Type:            p.VenueType(),
 			Status:          strings.ToLower(p.Status().String()),
 			SupportedAssets: assets,
 			HasCredentials:  hasCred,
-			LatencyMs:       latencyMs,
+			LatencyP50Ms:    latencyP50Ms,
+			LatencyP99Ms:    latencyP99Ms,
+			FillRate:        fillRate,
+			LastHeartbeat:   lastHeartbeat,
 		})
 	}
 

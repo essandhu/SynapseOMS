@@ -65,22 +65,22 @@ func TestListInstruments_ReturnsInstruments(t *testing.T) {
 	if btc["symbol"] != "BTC-USD" {
 		t.Errorf("expected symbol 'BTC-USD', got %v", btc["symbol"])
 	}
-	if btc["asset_class"] != "crypto" {
-		t.Errorf("expected asset_class 'crypto', got %v", btc["asset_class"])
+	if btc["assetClass"] != "crypto" {
+		t.Errorf("expected assetClass 'crypto', got %v", btc["assetClass"])
 	}
-	if btc["quote_currency"] != "USD" {
-		t.Errorf("expected quote_currency 'USD', got %v", btc["quote_currency"])
+	if btc["quoteCurrency"] != "USD" {
+		t.Errorf("expected quoteCurrency 'USD', got %v", btc["quoteCurrency"])
 	}
-	if btc["base_currency"] != "BTC" {
-		t.Errorf("expected base_currency 'BTC', got %v", btc["base_currency"])
+	if btc["baseCurrency"] != "BTC" {
+		t.Errorf("expected baseCurrency 'BTC', got %v", btc["baseCurrency"])
 	}
-	if btc["settlement_cycle"] != "T+0" {
-		t.Errorf("expected settlement_cycle 'T+0', got %v", btc["settlement_cycle"])
+	if btc["settlementCycle"] != "T+0" {
+		t.Errorf("expected settlementCycle 'T+0', got %v", btc["settlementCycle"])
 	}
 
 	// Check decimal fields are serialized as strings.
-	if btc["tick_size"] != "0.01" {
-		t.Errorf("expected tick_size '0.01', got %v", btc["tick_size"])
+	if btc["tickSize"] != "0.01" {
+		t.Errorf("expected tickSize '0.01', got %v", btc["tickSize"])
 	}
 
 	// Check venues array.
@@ -89,13 +89,18 @@ func TestListInstruments_ReturnsInstruments(t *testing.T) {
 		t.Errorf("expected 2 venues, got %v", btc["venues"])
 	}
 
+	// Check venueId is populated from first venue.
+	if btc["venueId"] != "binance" {
+		t.Errorf("expected venueId 'binance', got %v", btc["venueId"])
+	}
+
 	// Check second instrument (equity).
 	aapl := instruments[1]
-	if aapl["asset_class"] != "equity" {
-		t.Errorf("expected asset_class 'equity', got %v", aapl["asset_class"])
+	if aapl["assetClass"] != "equity" {
+		t.Errorf("expected assetClass 'equity', got %v", aapl["assetClass"])
 	}
-	if aapl["settlement_cycle"] != "T+2" {
-		t.Errorf("expected settlement_cycle 'T+2', got %v", aapl["settlement_cycle"])
+	if aapl["settlementCycle"] != "T+2" {
+		t.Errorf("expected settlementCycle 'T+2', got %v", aapl["settlementCycle"])
 	}
 }
 

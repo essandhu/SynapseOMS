@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
+	"github.com/synapse-oms/gateway/internal/adapter"
 	"github.com/synapse-oms/gateway/internal/apperror"
 	"github.com/synapse-oms/gateway/internal/domain"
 	"github.com/synapse-oms/gateway/internal/metrics"
@@ -155,7 +156,7 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check instrument exists
-	_, err = h.store.GetInstrument(r.Context(), req.InstrumentID)
+	inst, err := h.store.GetInstrument(r.Context(), req.InstrumentID)
 	if err != nil {
 		apperror.WriteError(w, apperror.ErrInstrumentNotFound)
 		return
@@ -176,6 +177,99 @@ func (h *handler) submitOrder(w http.ResponseWriter, r *http.Request) {
 	venueID := strings.TrimSpace(req.VenueID)
 	if strings.EqualFold(venueID, "smart") {
 		venueID = ""
+	}
+
+	// Validate venue is connected when explicitly specified
+	if venueID != "" {
+		if err := adapter.CheckVenueReady(venueID); err != nil {
+			apperror.WriteError(w, &apperror.AppError{
+				Code:       "VENUE_NOT_CONNECTED",
+				Message:    "venue is not connected: " + venueID,
+				HTTPStatus: http.StatusBadRequest,
+			})
+			return
+		}
+
+		// Validate venue supports the instrument's asset class
+		if provider, ok := adapter.GetInstance(venueID); ok {
+			supported := false
+			for _, ac := range provider.SupportedAssetClasses() {
+				if ac == inst.AssetClass {
+					supported = true
+					break
+				}
+			}
+			if !supported {
+				apperror.WriteError(w, &apperror.AppError{
+					Code:       "VENUE_ASSET_MISMATCH",
+					Message:    "venue " + venueID + " does not support asset class " + assetClassToString(inst.AssetClass),
+					HTTPStatus: http.StatusBadRequest,
+				})
+				return
+			}
+		}
+	}
+
+	// For smart routing, verify at least one compatible venue is connected
+	if venueID == "" {
+		connected := adapter.ListConnected()
+		hasCompatible := false
+		for _, p := range connected {
+			for _, ac := range p.SupportedAssetClasses() {
+				if ac == inst.AssetClass {
+					hasCompatible = true
+					break
+				}
+			}
+			if hasCompatible {
+				break
+			}
+		}
+		if !hasCompatible {
+			apperror.WriteError(w, &apperror.AppError{
+				Code:       "NO_CONNECTED_VENUE",
+				Message:    "no connected venue supports " + assetClassToString(inst.AssetClass),
+				HTTPStatus: http.StatusBadRequest,
+			})
+			return
+		}
+	}
+
+	// Sell-side validation: ensure sufficient position is held
+	if side == domain.SideSell {
+		positions, listErr := h.store.ListPositions(r.Context())
+		if listErr != nil {
+			apperror.WriteError(w, &apperror.AppError{
+				Code:       "INTERNAL_ERROR",
+				Message:    "failed to check positions",
+				HTTPStatus: http.StatusInternalServerError,
+			})
+			return
+		}
+
+		var netQty decimal.Decimal
+		for _, pos := range positions {
+			if pos.InstrumentID == req.InstrumentID {
+				netQty = netQty.Add(pos.Quantity)
+			}
+		}
+
+		if !netQty.IsPositive() {
+			apperror.WriteError(w, &apperror.AppError{
+				Code:       "INSUFFICIENT_POSITION",
+				Message:    "no position held for " + req.InstrumentID,
+				HTTPStatus: http.StatusBadRequest,
+			})
+			return
+		}
+		if quantity.GreaterThan(netQty) {
+			apperror.WriteError(w, &apperror.AppError{
+				Code:       "INSUFFICIENT_POSITION",
+				Message:    "sell quantity exceeds held position (" + netQty.String() + " available)",
+				HTTPStatus: http.StatusBadRequest,
+			})
+			return
+		}
 	}
 
 	order := &domain.Order{

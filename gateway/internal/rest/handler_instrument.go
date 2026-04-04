@@ -13,17 +13,22 @@ type instrumentResponse struct {
 	ID              string   `json:"id"`
 	Symbol          string   `json:"symbol"`
 	Name            string   `json:"name"`
-	AssetClass      string   `json:"asset_class"`
-	QuoteCurrency   string   `json:"quote_currency"`
-	BaseCurrency    string   `json:"base_currency,omitempty"`
-	TickSize        string   `json:"tick_size"`
-	LotSize         string   `json:"lot_size"`
-	SettlementCycle string   `json:"settlement_cycle"`
+	AssetClass      string   `json:"assetClass"`
+	QuoteCurrency   string   `json:"quoteCurrency"`
+	BaseCurrency    string   `json:"baseCurrency,omitempty"`
+	TickSize        string   `json:"tickSize"`
+	LotSize         string   `json:"lotSize"`
+	SettlementCycle string   `json:"settlementCycle"`
 	Venues          []string `json:"venues"`
-	MarginRequired  string   `json:"margin_required"`
+	VenueID         string   `json:"venueId"`
+	MarginRequired  string   `json:"marginRequired"`
 }
 
 func toInstrumentResponse(inst *domain.Instrument) instrumentResponse {
+	venueID := ""
+	if len(inst.Venues) > 0 {
+		venueID = inst.Venues[0]
+	}
 	return instrumentResponse{
 		ID:              inst.ID,
 		Symbol:          inst.Symbol,
@@ -35,6 +40,7 @@ func toInstrumentResponse(inst *domain.Instrument) instrumentResponse {
 		LotSize:         inst.LotSize.String(),
 		SettlementCycle: settlementCycleStr(inst.SettlementCycle),
 		Venues:          inst.Venues,
+		VenueID:         venueID,
 		MarginRequired:  inst.MarginRequired.String(),
 	}
 }

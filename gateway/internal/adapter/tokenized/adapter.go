@@ -80,8 +80,9 @@ func NewAdapter(_ map[string]string) adapter.LiquidityProvider {
 	}
 }
 
-func (a *Adapter) VenueID() string  { return venueID }
-func (a *Adapter) VenueName() string { return venueName }
+func (a *Adapter) VenueID() string   { return venueID }
+func (a *Adapter) VenueName() string  { return venueName }
+func (a *Adapter) VenueType() string  { return "tokenized" }
 
 func (a *Adapter) SupportedAssetClasses() []domain.AssetClass {
 	return []domain.AssetClass{domain.AssetClassTokenizedSecurity}
