@@ -9,7 +9,7 @@ test.describe("Insights Panel E2E", () => {
 
     // Submit an order so there may be execution data
     await submitMarketBuy(page, "10");
-    await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/filled/i).first()).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Insights
     await page.getByRole("link", { name: "Insights" }).click();

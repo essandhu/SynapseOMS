@@ -3,10 +3,24 @@ import { expect, type Page } from "@playwright/test";
 /**
  * Complete onboarding with the simulator venue.
  * After this function returns, the user is on the BlotterView.
+ *
+ * If onboarding was already completed (e.g. by a prior test against the same
+ * backend), the helper detects the redirect to the dashboard and returns early.
  */
 export async function completeOnboarding(page: Page) {
-  await page.goto("/onboarding");
-  await page.getByText("Get Started").click();
+  await page.goto("/");
+
+  // The app either shows onboarding (first run) or the dashboard.
+  const getStarted = page.getByText("Get Started");
+  const submitOrder = page.getByText("Submit Order");
+  await getStarted.or(submitOrder).waitFor({ timeout: 15_000 });
+
+  // Already past onboarding — the dashboard loaded directly.
+  if (await submitOrder.isVisible()) {
+    return;
+  }
+
+  await getStarted.click();
 
   const passwordInputs = page.locator('input[type="password"]');
   await passwordInputs.nth(0).fill("TestPassphrase123!");

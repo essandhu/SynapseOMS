@@ -9,7 +9,7 @@ test.describe("Multi-Venue Portfolio E2E", () => {
 
     // Submit a market buy for AAPL (equity)
     await submitMarketBuy(page, "10");
-    await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/filled/i).first()).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Venues to connect a second venue (simulated crypto)
     await page.getByRole("link", { name: "Venues" }).click();

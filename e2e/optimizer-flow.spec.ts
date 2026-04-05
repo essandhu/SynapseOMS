@@ -7,7 +7,7 @@ test.describe("Portfolio Optimizer E2E", () => {
 
     // Submit an order to create a position
     await submitMarketBuy(page, "10");
-    await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/filled/i).first()).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Optimizer
     await page.getByRole("link", { name: "Optimizer" }).click();

@@ -9,7 +9,7 @@ test.describe("Portfolio View E2E", () => {
 
     // Submit an order so there is at least one position
     await submitMarketBuy(page, "10");
-    await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/filled/i).first()).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Portfolio
     await page.getByRole("link", { name: "Portfolio" }).click();

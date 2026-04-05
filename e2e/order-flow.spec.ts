@@ -18,7 +18,7 @@ test.describe("Order Flow E2E", () => {
 
     // Wait for order to appear in blotter as "Filled"
     // The simulated exchange fills market orders instantly
-    await expect(page.getByText(/filled/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/filled/i).first()).toBeVisible({ timeout: 30_000 });
 
     // Navigate to Risk dashboard via nav tab
     await page.getByRole("link", { name: "Risk" }).click();

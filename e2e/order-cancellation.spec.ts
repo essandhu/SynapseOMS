@@ -25,7 +25,7 @@ test.describe("Order Cancellation E2E", () => {
 
     // Wait for order to appear with "Acknowledged" status
     await expect(
-      page.getByText(/acknowledged|new|open/i),
+      page.getByText(/acknowledged|new|open/i).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Click cancel on the order
@@ -35,7 +35,7 @@ test.describe("Order Cancellation E2E", () => {
     await cancelButton.click();
 
     // Verify order status changes to "Canceled"
-    await expect(page.getByText(/canceled|cancelled/i)).toBeVisible({
+    await expect(page.getByText(/canceled|cancelled/i).first()).toBeVisible({
       timeout: 15_000,
     });
   });
