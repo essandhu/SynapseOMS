@@ -7,7 +7,7 @@ test.describe("Order Cancellation E2E", () => {
   }) => {
     await completeOnboarding(page);
 
-    // Switch to Limit order type via button group (not a select)
+    // Switch to Limit order type via button group
     await page.getByRole("button", { name: "Limit" }).click();
 
     // Set side to Buy
@@ -22,19 +22,14 @@ test.describe("Order Cancellation E2E", () => {
     // Submit the limit order
     await page.getByText("Submit Order").click();
 
-    // Wait for order to appear with "Ack" or "New" status badge
-    await expect(
-      page.getByText(/^Ack$|^New$/i).first(),
-    ).toBeVisible({ timeout: 15_000 });
-
-    // Click cancel on the order
-    const cancelButton = page
-      .getByRole("button", { name: /cancel/i })
-      .first();
+    // Wait for the Cancel button to appear — it only renders for
+    // non-terminal orders (new, acknowledged, partially filled).
+    const cancelButton = page.getByRole("button", { name: "Cancel" }).first();
+    await expect(cancelButton).toBeVisible({ timeout: 15_000 });
     await cancelButton.click();
 
     // Verify order status changes to "Canceled"
-    await expect(page.getByText(/canceled|cancelled/i).first()).toBeVisible({
+    await expect(page.getByText(/Canceled/i).first()).toBeVisible({
       timeout: 15_000,
     });
   });
