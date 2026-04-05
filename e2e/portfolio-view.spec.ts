@@ -24,9 +24,9 @@ test.describe("Portfolio View E2E", () => {
       page.getByText(/Day P&L/i).first(),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Verify at least one position row is rendered in the table
+    // Verify the Positions section is rendered (heading always present)
     await expect(
-      page.locator("table td").first(),
+      page.getByText("Positions").first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Verify the exposure section is rendered

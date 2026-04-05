@@ -25,9 +25,9 @@ test.describe("Venue Management E2E", () => {
     // Navigate to Venues
     await page.getByRole("link", { name: "Venues" }).click();
 
-    // Verify venue metrics are present (fill rate or latency labels)
+    // Verify venue metrics are present via data-testid
     await expect(
-      page.getByText(/Fill Rate:|P50:|P99:/i).first(),
+      page.locator('[data-testid="fill-rate"]').first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

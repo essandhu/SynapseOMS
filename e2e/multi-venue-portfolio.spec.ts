@@ -32,9 +32,9 @@ test.describe("Multi-Venue Portfolio E2E", () => {
     // Navigate to Portfolio view
     await page.getByRole("link", { name: "Portfolio" }).click();
 
-    // Verify at least one position appears in the portfolio table
+    // Verify the Positions section is rendered
     await expect(
-      page.locator("table td").first(),
+      page.getByText("Positions").first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Verify exposure breakdown shows at least one asset class

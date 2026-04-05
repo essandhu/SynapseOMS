@@ -22,9 +22,9 @@ test.describe("Order Cancellation E2E", () => {
     // Submit the limit order
     await page.getByText("Submit Order").click();
 
-    // Wait for order to appear with "Acknowledged" status
+    // Wait for order to appear with "Ack" or "New" status badge
     await expect(
-      page.getByText(/acknowledged|new|open/i).first(),
+      page.getByText(/^Ack$|^New$/i).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Click cancel on the order
