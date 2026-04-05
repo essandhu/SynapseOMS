@@ -11,7 +11,7 @@ export async function completeOnboarding(page: Page) {
   const passwordInputs = page.locator('input[type="password"]');
   await passwordInputs.nth(0).fill("TestPassphrase123!");
   await passwordInputs.nth(1).fill("TestPassphrase123!");
-  await page.getByText("Continue").click();
+  await page.getByText("Set Passphrase").click();
 
   await page.getByText("Start with Simulator").click();
   await page.getByText("Skip to Finish").click();
