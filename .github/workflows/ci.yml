@@ -112,7 +112,7 @@ jobs:
         run: docker build -f gateway/Dockerfile -t synapse-gateway:ci gateway/
 
       - name: Build risk-engine image
-        run: docker build -f risk-engine/Dockerfile -t synapse-risk-engine:ci risk-engine/
+        run: docker build -f risk-engine/Dockerfile -t synapse-risk-engine:ci .
 
       - name: Build dashboard image
         run: docker build -f dashboard/Dockerfile -t synapse-dashboard:ci dashboard/
