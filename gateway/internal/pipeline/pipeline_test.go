@@ -39,16 +39,14 @@ func posKey(instrumentID, venueID string) string {
 func (m *memStore) CreateOrder(_ context.Context, o *domain.Order) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cp := *o
-	m.orders[o.ID] = &cp
+	m.orders[o.ID] = o.Snapshot()
 	return nil
 }
 
 func (m *memStore) UpdateOrder(_ context.Context, o *domain.Order) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cp := *o
-	m.orders[o.ID] = &cp
+	m.orders[o.ID] = o.Snapshot()
 	return nil
 }
 
@@ -59,8 +57,7 @@ func (m *memStore) GetOrder(_ context.Context, id domain.OrderID) (*domain.Order
 	if !ok {
 		return nil, fmt.Errorf("order not found: %s", id)
 	}
-	cp := *o
-	return &cp, nil
+	return o.Snapshot(), nil
 }
 
 func (m *memStore) CreateFill(_ context.Context, f *domain.Fill) error {
@@ -96,8 +93,7 @@ func (m *memStore) getOrder(id domain.OrderID) *domain.Order {
 	if o == nil {
 		return nil
 	}
-	cp := *o
-	return &cp
+	return o.Snapshot()
 }
 
 func (m *memStore) getPosition(instrumentID, venueID string) *domain.Position {
@@ -255,8 +251,7 @@ func newMockNotifier() *mockNotifier {
 func (n *mockNotifier) NotifyOrderUpdate(order *domain.Order) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	cp := *order
-	n.orderUpdates = append(n.orderUpdates, &cp)
+	n.orderUpdates = append(n.orderUpdates, order.Snapshot())
 }
 
 func (n *mockNotifier) NotifyPositionUpdate(position *domain.Position) {

@@ -106,11 +106,10 @@ func (e *CrossingEngine) TryCross(order *domain.Order) (*CrossResult, error) {
 		// Determine if incoming order has residual.
 		order.FilledQuantity = order.FilledQuantity.Add(fillQty)
 		if order.FilledQuantity.LessThan(order.Quantity) {
-			residual := *order // shallow copy
 			return &CrossResult{
 				Crossed:       true,
 				Fills:         fills,
-				ResidualOrder: &residual,
+				ResidualOrder: order.Snapshot(),
 			}, nil
 		}
 

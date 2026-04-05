@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -50,6 +51,7 @@ const (
 
 // Order represents a trading order with state machine semantics.
 type Order struct {
+	mu              sync.Mutex
 	ID              OrderID
 	ClientOrderID   string
 	InstrumentID    string
@@ -81,8 +83,37 @@ var (
 	ErrOrderNotFillable  = errors.New("order is not in a fillable state")
 )
 
+// Snapshot returns a point-in-time copy of the order that is safe to read
+// without holding the order's mutex.
+func (o *Order) Snapshot() *Order {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	fills := make([]Fill, len(o.Fills))
+	copy(fills, o.Fills)
+	return &Order{
+		ID:              o.ID,
+		ClientOrderID:   o.ClientOrderID,
+		InstrumentID:    o.InstrumentID,
+		Side:            o.Side,
+		Type:            o.Type,
+		Quantity:        o.Quantity,
+		Price:           o.Price,
+		FilledQuantity:  o.FilledQuantity,
+		AveragePrice:    o.AveragePrice,
+		Status:          o.Status,
+		VenueID:         o.VenueID,
+		AssetClass:      o.AssetClass,
+		SettlementCycle: o.SettlementCycle,
+		CreatedAt:       o.CreatedAt,
+		UpdatedAt:       o.UpdatedAt,
+		Fills:           fills,
+	}
+}
+
 // ApplyTransition transitions the order to a new status if the transition is valid.
 func (o *Order) ApplyTransition(newStatus OrderStatus) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	allowed, ok := validTransitions[o.Status]
 	if !ok {
 		return fmt.Errorf("%w: %d -> %d", ErrInvalidTransition, o.Status, newStatus)
@@ -101,6 +132,8 @@ func (o *Order) ApplyTransition(newStatus OrderStatus) error {
 
 // ApplyFill applies a fill to the order, updating filled quantity, VWAP, and status.
 func (o *Order) ApplyFill(fill Fill) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	if o.Status != OrderStatusAcknowledged && o.Status != OrderStatusPartiallyFilled {
 		return fmt.Errorf("%w: status=%d", ErrOrderNotFillable, o.Status)
 	}

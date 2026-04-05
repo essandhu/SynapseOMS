@@ -62,7 +62,7 @@ func (s *PostgresStore) GetOrder(ctx context.Context, id domain.OrderID) (*domai
 }
 
 // ListOrders retrieves orders matching the given filter.
-func (s *PostgresStore) ListOrders(ctx context.Context, filter OrderFilter) ([]domain.Order, error) {
+func (s *PostgresStore) ListOrders(ctx context.Context, filter OrderFilter) ([]*domain.Order, error) {
 	query := `
 		SELECT id, client_order_id, instrument_id, side, type,
 			quantity, price, filled_quantity, average_price, status,
@@ -91,13 +91,13 @@ func (s *PostgresStore) ListOrders(ctx context.Context, filter OrderFilter) ([]d
 	}
 	defer rows.Close()
 
-	var orders []domain.Order
+	var orders []*domain.Order
 	for rows.Next() {
 		o, err := scanOrderFromRows(rows)
 		if err != nil {
 			return nil, err
 		}
-		orders = append(orders, *o)
+		orders = append(orders, o)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating orders: %w", err)

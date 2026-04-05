@@ -772,28 +772,30 @@ func (p *Pipeline) processFill(ctx context.Context, fill domain.Fill) {
 // (optionally) the Kafka producer. For status-only events (not fills), it
 // publishes a structured OrderLifecycleEvent envelope to Kafka.
 func (p *Pipeline) notifyOrderUpdate(ctx context.Context, order *domain.Order) {
-	p.notifier.NotifyOrderUpdate(order)
+	snap := order.Snapshot()
+	p.notifier.NotifyOrderUpdate(snap)
 
 	if p.kafka != nil {
-		eventType := orderStatusToEventType(order.Status)
+		eventType := orderStatusToEventType(snap.Status)
 		if eventType == "" {
 			return
 		}
-		p.publishOrderEvent(ctx, eventType, order, nil)
+		p.publishOrderEvent(ctx, eventType, snap, nil)
 	}
 }
 
 // notifyFillEvent sends an order update and publishes a fill_received event
 // to Kafka with the fill details needed by the risk engine.
 func (p *Pipeline) notifyFillEvent(ctx context.Context, order *domain.Order, fill domain.Fill) {
-	p.notifier.NotifyOrderUpdate(order)
+	snap := order.Snapshot()
+	p.notifier.NotifyOrderUpdate(snap)
 
 	if p.kafka != nil {
-		p.publishOrderEvent(ctx, kafkapkg.EventFillReceived, order, &fill)
+		p.publishOrderEvent(ctx, kafkapkg.EventFillReceived, snap, &fill)
 
 		// If the order is fully filled, also publish a terminal event
-		if order.Status == domain.OrderStatusFilled {
-			p.publishOrderEvent(ctx, kafkapkg.EventOrderFilled, order, nil)
+		if snap.Status == domain.OrderStatusFilled {
+			p.publishOrderEvent(ctx, kafkapkg.EventOrderFilled, snap, nil)
 		}
 	}
 }

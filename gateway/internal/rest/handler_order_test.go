@@ -37,7 +37,7 @@ func (m *mockPipeline) Submit(ctx context.Context, order *domain.Order) error {
 // --- mock store ---
 
 type mockStore struct {
-	orders      []domain.Order
+	orders      []*domain.Order
 	positions   []domain.Position
 	instruments []domain.Instrument
 	fills       []domain.Fill
@@ -51,17 +51,16 @@ func (m *mockStore) UpsertPosition(_ context.Context, _ *domain.Position) error 
 }
 
 func (m *mockStore) GetOrder(_ context.Context, id domain.OrderID) (*domain.Order, error) {
-	for i := range m.orders {
-		if m.orders[i].ID == id {
-			o := m.orders[i]
-			return &o, nil
+	for _, o := range m.orders {
+		if o.ID == id {
+			return o, nil
 		}
 	}
 	return nil, fmt.Errorf("scanning order: no rows in result set")
 }
 
-func (m *mockStore) ListOrders(_ context.Context, filter store.OrderFilter) ([]domain.Order, error) {
-	var result []domain.Order
+func (m *mockStore) ListOrders(_ context.Context, filter store.OrderFilter) ([]*domain.Order, error) {
+	var result []*domain.Order
 	for _, o := range m.orders {
 		if filter.Status != nil && o.Status != *filter.Status {
 			continue
@@ -401,7 +400,7 @@ func TestSubmitOrder_ValidationErrors(t *testing.T) {
 
 func TestListOrders(t *testing.T) {
 	ms := &mockStore{
-		orders: []domain.Order{
+		orders: []*domain.Order{
 			{
 				ID:           "order-1",
 				InstrumentID: "AAPL",
@@ -451,7 +450,7 @@ func TestListOrders(t *testing.T) {
 
 func TestGetOrder(t *testing.T) {
 	ms := &mockStore{
-		orders: []domain.Order{
+		orders: []*domain.Order{
 			{
 				ID:             "order-1",
 				InstrumentID:   "AAPL",

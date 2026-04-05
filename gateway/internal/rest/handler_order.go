@@ -343,8 +343,8 @@ func (h *handler) listOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := make([]orderResponse, 0, len(orders))
-	for i := range orders {
-		result = append(result, toOrderResponse(&orders[i]))
+	for _, o := range orders {
+		result = append(result, toOrderResponse(o))
 	}
 
 	w.WriteHeader(http.StatusOK)

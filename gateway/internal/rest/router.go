@@ -21,7 +21,7 @@ type OrderSubmitter interface {
 // ReadStore is the interface for read queries used by REST handlers.
 type ReadStore interface {
 	GetOrder(ctx context.Context, id domain.OrderID) (*domain.Order, error)
-	ListOrders(ctx context.Context, filter store.OrderFilter) ([]domain.Order, error)
+	ListOrders(ctx context.Context, filter store.OrderFilter) ([]*domain.Order, error)
 	GetPosition(ctx context.Context, instrumentID, venueID string) (*domain.Position, error)
 	ListPositions(ctx context.Context) ([]domain.Position, error)
 	GetInstrument(ctx context.Context, id string) (*domain.Instrument, error)

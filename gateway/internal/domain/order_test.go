@@ -58,7 +58,7 @@ func TestApplyFill(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		order          Order
+		order          *Order
 		fill           Fill
 		wantErr        bool
 		wantStatus     OrderStatus
@@ -67,7 +67,7 @@ func TestApplyFill(t *testing.T) {
 	}{
 		{
 			name: "partial fill on acknowledged order",
-			order: Order{
+			order: &Order{
 				ID:             "ord-1",
 				Status:         OrderStatusAcknowledged,
 				Quantity:       decimal.NewFromInt(100),
@@ -88,7 +88,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "second partial fill with VWAP",
-			order: Order{
+			order: &Order{
 				ID:             "ord-2",
 				Status:         OrderStatusPartiallyFilled,
 				Quantity:       decimal.NewFromInt(100),
@@ -110,7 +110,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "full fill completes order",
-			order: Order{
+			order: &Order{
 				ID:             "ord-3",
 				Status:         OrderStatusPartiallyFilled,
 				Quantity:       decimal.NewFromInt(100),
@@ -132,7 +132,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "overfill rejected",
-			order: Order{
+			order: &Order{
 				ID:             "ord-4",
 				Status:         OrderStatusPartiallyFilled,
 				Quantity:       decimal.NewFromInt(100),
@@ -150,7 +150,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "fill on new order rejected",
-			order: Order{
+			order: &Order{
 				ID:             "ord-5",
 				Status:         OrderStatusNew,
 				Quantity:       decimal.NewFromInt(100),
@@ -168,7 +168,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "fill on filled order rejected",
-			order: Order{
+			order: &Order{
 				ID:             "ord-6",
 				Status:         OrderStatusFilled,
 				Quantity:       decimal.NewFromInt(100),
@@ -186,7 +186,7 @@ func TestApplyFill(t *testing.T) {
 		},
 		{
 			name: "full fill from acknowledged",
-			order: Order{
+			order: &Order{
 				ID:             "ord-7",
 				Status:         OrderStatusAcknowledged,
 				Quantity:       decimal.NewFromInt(50),
