@@ -189,7 +189,7 @@ export function PortfolioView() {
     };
   }, []);
 
-  const positionList = Array.from(positions.values());
+  const positionList = useMemo(() => Array.from(positions.values()), [positions]);
   const dailyPnl = summary ? Number(summary.dailyPnl) : 0;
   const pnlPositive = dailyPnl >= 0;
 

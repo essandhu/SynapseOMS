@@ -49,6 +49,7 @@ export function ExposureTreemap({ data }: ExposureTreemapProps) {
           nameKey="name"
           stroke="none"
           paddingAngle={2}
+          isAnimationActive={false}
         >
           {data.map((entry) => (
             <Cell key={entry.name} fill={entry.color} />
