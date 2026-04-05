@@ -7,18 +7,17 @@ test.describe("Order Cancellation E2E", () => {
   }) => {
     await completeOnboarding(page);
 
-    // Switch to Limit order type
-    const typeSelect = page.locator("select").nth(1);
-    await typeSelect.selectOption("limit");
+    // Switch to Limit order type via button group (not a select)
+    await page.getByRole("button", { name: "Limit" }).click();
 
     // Set side to Buy
     await page.getByRole("button", { name: "Buy" }).click();
 
     // Enter quantity
-    await page.locator('input[placeholder="0"]').first().fill("10");
+    await page.locator("#order-quantity").fill("10");
 
     // Set a limit price far from market ($1.00 — won't fill)
-    await page.locator('input[placeholder="0.00"]').fill("1.00");
+    await page.locator("#order-price").fill("1.00");
 
     // Submit the limit order
     await page.getByText("Submit Order").click();

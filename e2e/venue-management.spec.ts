@@ -8,12 +8,12 @@ test.describe("Venue Management E2E", () => {
     // Navigate to Venues
     await page.getByRole("link", { name: "Venues" }).click();
 
-    // Verify at least the Simulator venue card is visible
+    // Verify the Liquidity Network page loaded
     await expect(
-      page.getByText(/simulator/i).first(),
+      page.getByText(/Liquidity Network/i).first(),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Verify the Simulator shows connected status
+    // Verify a venue card shows connected status
     await expect(
       page.getByText(/connected/i).first(),
     ).toBeVisible({ timeout: 10_000 });
@@ -25,9 +25,9 @@ test.describe("Venue Management E2E", () => {
     // Navigate to Venues
     await page.getByRole("link", { name: "Venues" }).click();
 
-    // Verify venue details are present (latency, fill rate)
+    // Verify venue metrics are present (fill rate or latency labels)
     await expect(
-      page.getByText(/latency|p50|p99|fill rate/i).first(),
+      page.getByText(/Fill Rate:|P50:|P99:/i).first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

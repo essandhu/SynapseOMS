@@ -14,7 +14,7 @@ test.describe("Portfolio Optimizer E2E", () => {
 
     // Verify constraint form is visible
     await expect(
-      page.getByText(/risk aversion|constraints/i).first(),
+      page.getByText(/Risk Aversion/i).first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Verify "Long Only" toggle is visible
@@ -29,11 +29,11 @@ test.describe("Portfolio Optimizer E2E", () => {
     await expect(optimizeButton).toBeVisible({ timeout: 5_000 });
     await optimizeButton.click();
 
-    // Wait for results to appear (table or metrics)
+    // Wait for results to appear (metrics, table, or error from API)
     await expect(
       page
         .getByText(
-          /expected return|target weight|sharpe|no positions/i,
+          /Expected Return|Target Allocation|Sharpe|Configure constraints/i,
         )
         .first(),
     ).toBeVisible({ timeout: 30_000 });

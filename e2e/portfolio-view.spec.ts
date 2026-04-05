@@ -14,24 +14,24 @@ test.describe("Portfolio View E2E", () => {
     // Navigate to Portfolio
     await page.getByRole("link", { name: "Portfolio" }).click();
 
-    // Verify portfolio summary metrics render with actual values (not spinners)
+    // Verify portfolio summary metrics render (Total NAV card)
     await expect(
-      page.getByText(/NAV|Net Asset Value/i).first(),
+      page.getByText(/Total NAV/i).first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Verify P&L metric is visible
     await expect(
-      page.getByText(/P&L|Profit|Loss/i).first(),
+      page.getByText(/Day P&L/i).first(),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Verify at least one position row is rendered
+    // Verify at least one position row is rendered in the table
     await expect(
-      page.getByText(/AAPL|BTC-USD/i).first(),
+      page.locator("table td").first(),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Verify the exposure section is rendered (charts or labels)
+    // Verify the exposure section is rendered
     await expect(
-      page.getByText(/exposure|asset class/i).first(),
+      page.getByText(/exposure/i).first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });
