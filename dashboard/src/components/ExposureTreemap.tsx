@@ -1,4 +1,5 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
+import { useRef, useState, useEffect } from "react";
 
 export interface ExposureTreemapDatum {
   name: string;
@@ -36,27 +37,45 @@ export function ExposureTreemap({ data }: ExposureTreemapProps) {
     );
   }
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        setSize({ width, height });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius="55%"
-          outerRadius="85%"
-          dataKey="value"
-          nameKey="name"
-          stroke="none"
-          paddingAngle={2}
-          isAnimationActive={false}
-        >
-          {data.map((entry) => (
-            <Cell key={entry.name} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip content={<CustomTooltip />} />
-      </PieChart>
-    </ResponsiveContainer>
+    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
+      {size.width > 0 && size.height > 0 && (
+        <PieChart width={size.width} height={size.height}>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius="55%"
+            outerRadius="85%"
+            dataKey="value"
+            nameKey="name"
+            stroke="none"
+            paddingAngle={2}
+            isAnimationActive={false}
+          >
+            {data.map((entry) => (
+              <Cell key={entry.name} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip content={<CustomTooltip />} />
+        </PieChart>
+      )}
+    </div>
   );
 }

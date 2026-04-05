@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -229,7 +229,9 @@ export function PortfolioView() {
 
   // Compute exposure from live position data so it always reflects current
   // positions even when the risk engine's Kafka pipeline is unavailable.
-  const assetClassData = useMemo(() => {
+  // We serialize to a stable key so the chart only re-renders when rounded
+  // percentages actually change (not on every WS tick).
+  const assetClassRaw = useMemo(() => {
     if (positionList.length === 0) return [];
     const groups: Record<string, number> = {};
     let total = 0;
@@ -239,12 +241,23 @@ export function PortfolioView() {
       total += mv;
     }
     if (total === 0) return [];
-    return Object.entries(groups).map(([name, value]) => ({
-      name,
-      value: (value / total) * 100,
-      color: ASSET_CLASS_COLORS[name] ?? "#6b7280",
-    }));
+    return Object.entries(groups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, value]) => ({
+        name,
+        value: Math.round((value / total) * 1000) / 10,
+        color: ASSET_CLASS_COLORS[name] ?? "#6b7280",
+      }));
   }, [positionList]);
+
+  const assetClassKey = assetClassRaw
+    .map((d) => `${d.name}:${d.value}`)
+    .join(",");
+  const prevAssetClassRef = useRef({ key: "", data: assetClassRaw });
+  const assetClassData =
+    assetClassKey === prevAssetClassRef.current.key
+      ? prevAssetClassRef.current.data
+      : (prevAssetClassRef.current = { key: assetClassKey, data: assetClassRaw }).data;
 
   const venueData = useMemo(() => {
     if (positionList.length === 0) return [];
