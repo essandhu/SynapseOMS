@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 const NUM_BINS = 50;
-const COLOR_NORMAL = "#3b82f6";
+const COLOR_NORMAL = "#7132f5";
 const COLOR_CVAR = "#991b1b";
 const COLOR_VAR_LINE = "#ef4444";
 const COLOR_CVAR_LINE = "#f97316";
@@ -79,7 +79,7 @@ function HistogramTooltip({
   if (!active || !payload?.length) return null;
   const bin = payload[0].payload;
   return (
-    <div className="rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg">
+    <div className="rounded border border-border bg-bg-secondary px-3 py-2 text-xs" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
       <p className="text-text-muted">
         {formatPnL(bin.rangeStart)} to {formatPnL(bin.rangeEnd)}
       </p>
@@ -107,11 +107,11 @@ export function MonteCarloPlot({
   if (!bins) {
     return (
       <div className="rounded border border-border border-dashed bg-bg-secondary p-4">
-        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Monte Carlo Distribution
         </h3>
         <div className="flex h-40 items-center justify-center">
-          <span className="font-mono text-xs text-text-muted">
+          <span className="text-xs text-text-muted">
             No Monte Carlo data available
           </span>
         </div>
@@ -122,10 +122,10 @@ export function MonteCarloPlot({
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Monte Carlo Distribution
         </h3>
-        <span className="font-mono text-[10px] text-text-muted">
+        <span className="text-[10px] text-text-muted">
           {distribution!.length.toLocaleString()} simulations &middot; {NUM_BINS} bins
         </span>
       </div>
@@ -135,32 +135,32 @@ export function MonteCarloPlot({
           data={bins}
           margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f1f3" vertical={false} />
           <XAxis
             dataKey="midpoint"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-            axisLine={{ stroke: "#374151" }}
+            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
+            axisLine={{ stroke: "#dedee5" }}
             tickLine={false}
             tickFormatter={formatPnL}
             label={{
               value: "P&L ($)",
               position: "insideBottomRight",
               offset: -4,
-              style: { fill: "#6b7280", fontSize: 10, fontFamily: "monospace" },
+              style: { fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" },
             }}
           />
           <YAxis
-            tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-            axisLine={{ stroke: "#374151" }}
+            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
+            axisLine={{ stroke: "#dedee5" }}
             tickLine={false}
             label={{
               value: "Frequency",
               angle: -90,
               position: "insideLeft",
               offset: 12,
-              style: { fill: "#6b7280", fontSize: 10, fontFamily: "monospace" },
+              style: { fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" },
             }}
           />
           <Tooltip content={<HistogramTooltip />} />
@@ -176,7 +176,7 @@ export function MonteCarloPlot({
                 position: "top",
                 fill: COLOR_VAR_LINE,
                 fontSize: 10,
-                fontFamily: "monospace",
+                fontFamily: "'IBM Plex Sans', sans-serif",
               }}
             />
           )}
@@ -192,7 +192,7 @@ export function MonteCarloPlot({
                 position: "top",
                 fill: COLOR_CVAR_LINE,
                 fontSize: 10,
-                fontFamily: "monospace",
+                fontFamily: "'IBM Plex Sans', sans-serif",
               }}
             />
           )}

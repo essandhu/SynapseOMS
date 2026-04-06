@@ -49,16 +49,16 @@ function InlineCredentialForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="mb-1 block font-mono text-xs text-text-secondary">
+        <label className="mb-1 block text-xs text-text-secondary">
           Venue
         </label>
-        <div className="rounded border border-border bg-bg-tertiary px-3 py-2 font-mono text-sm text-text-primary">
+        <div className="rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary">
           {preset.label}
         </div>
       </div>
 
       <div>
-        <label className="mb-1 block font-mono text-xs text-text-secondary">
+        <label className="mb-1 block text-xs text-text-secondary">
           API Key
         </label>
         <input
@@ -67,12 +67,12 @@ function InlineCredentialForm({
           onChange={(e) => setApiKey(e.target.value)}
           required
           placeholder="Enter API key"
-          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
         />
       </div>
 
       <div>
-        <label className="mb-1 block font-mono text-xs text-text-secondary">
+        <label className="mb-1 block text-xs text-text-secondary">
           API Secret
         </label>
         <input
@@ -81,12 +81,12 @@ function InlineCredentialForm({
           onChange={(e) => setApiSecret(e.target.value)}
           required
           placeholder="Enter API secret"
-          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
         />
       </div>
 
       <div>
-        <label className="mb-1 block font-mono text-xs text-text-secondary">
+        <label className="mb-1 block text-xs text-text-secondary">
           Passphrase{" "}
           <span className="text-text-muted">(optional)</span>
         </label>
@@ -95,7 +95,7 @@ function InlineCredentialForm({
           value={passphrase}
           onChange={(e) => setPassphrase(e.target.value)}
           placeholder="Enter passphrase if required"
-          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+          className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
         />
       </div>
 
@@ -103,14 +103,14 @@ function InlineCredentialForm({
         <button
           type="submit"
           disabled={submitting || !apiKey || !apiSecret}
-          className="flex-1 rounded border border-accent-green/30 bg-accent-green/10 px-4 py-2 font-mono text-xs font-medium text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex-1 rounded-xl border border-accent-green/30 bg-accent-green/10 px-4 py-2 text-xs font-medium text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? "Saving..." : "Save Credentials"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-border px-4 py-2 font-mono text-xs font-medium text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary"
+          className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-text-muted transition-colors hover:border-text-muted hover:text-text-secondary"
         >
           Cancel
         </button>
@@ -165,15 +165,15 @@ function ConnectModal({ open, onClose }: ConnectModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="w-full max-w-md rounded-lg border border-border bg-bg-secondary p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-lg border border-border bg-bg-secondary p-6" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
         {/* Modal header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="font-mono text-sm font-semibold text-text-primary">
+          <h2 className="text-sm font-semibold text-text-primary">
             Connect New Venue
           </h2>
           <button
@@ -199,7 +199,7 @@ function ConnectModal({ open, onClose }: ConnectModalProps) {
         {/* Venue type selector */}
         {!venueType ? (
           <div className="flex flex-col gap-3">
-            <p className="font-mono text-xs text-text-muted">
+            <p className="text-xs text-text-muted">
               Select a venue to connect:
             </p>
             {(Object.entries(VENUE_PRESETS) as [NewVenueType, { label: string }][]).map(
@@ -207,7 +207,7 @@ function ConnectModal({ open, onClose }: ConnectModalProps) {
                 <button
                   key={key}
                   onClick={() => setVenueType(key)}
-                  className="flex items-center gap-3 rounded border border-border bg-bg-tertiary px-4 py-3 text-left font-mono text-sm text-text-primary transition-colors hover:border-accent-blue hover:bg-accent-blue/5"
+                  className="flex items-center gap-3 rounded border border-border bg-bg-tertiary px-4 py-3 text-left text-sm text-text-primary transition-colors hover:border-accent-blue hover:bg-accent-blue/5"
                 >
                   <svg
                     className="h-5 w-5 text-accent-blue"
@@ -279,8 +279,6 @@ export function LiquidityNetwork() {
   const handleTestConnection = useCallback(
     (_venueId: string) => {
       // Test connection by triggering a connect cycle
-      // In a full implementation this would call a dedicated ping endpoint
-      // For now we re-connect to verify the venue is reachable
     },
     [],
   );
@@ -291,24 +289,24 @@ export function LiquidityNetwork() {
     <div className="flex h-full flex-col gap-4">
       {/* Header */}
       <div>
-        <h1 className="font-mono text-lg font-semibold text-text-primary">
+        <h1 className="text-lg font-semibold text-text-primary">
           Liquidity Network
         </h1>
-        <p className="font-mono text-xs text-text-muted">
+        <p className="text-xs text-text-muted">
           Manage venue connections &mdash; click any card to expand details
         </p>
       </div>
 
       {/* Error banner */}
       {error && (
-        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
+        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs text-accent-red">
           {error}
         </div>
       )}
 
       {/* Loading state */}
       {loading && venueList.length === 0 && (
-        <div className="flex items-center gap-2 font-mono text-xs text-text-muted">
+        <div className="flex items-center gap-2 text-xs text-text-muted">
           <svg
             className="h-4 w-4 animate-spin text-accent-blue"
             fill="none"
@@ -362,7 +360,7 @@ export function LiquidityNetwork() {
               d="M12 4.5v15m7.5-7.5h-15"
             />
           </svg>
-          <span className="font-mono text-sm font-medium text-text-muted">
+          <span className="text-sm font-medium text-text-muted">
             Connect New Venue
           </span>
         </button>

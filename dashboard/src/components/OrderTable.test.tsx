@@ -18,7 +18,7 @@ describe("OrderTable", () => {
     const { container } = render(
       <OrderTable orders={[]} onCancel={onCancel} />,
     );
-    expect(container.querySelector(".ag-theme-alpine-dark")).toBeTruthy();
+    expect(container.querySelector(".ag-theme-alpine")).toBeTruthy();
   });
 
   it("renders with orders", () => {
@@ -29,7 +29,7 @@ describe("OrderTable", () => {
     const { container } = render(
       <OrderTable orders={orders} onCancel={onCancel} />,
     );
-    expect(container.querySelector(".ag-theme-alpine-dark")).toBeTruthy();
+    expect(container.querySelector(".ag-theme-alpine")).toBeTruthy();
   });
 
   // --- Layout: scrolling and sizing ---
@@ -39,7 +39,7 @@ describe("OrderTable", () => {
       <OrderTable orders={[]} onCancel={onCancel} />,
     );
     const gridWrapper = container.querySelector(
-      ".ag-theme-alpine-dark",
+      ".ag-theme-alpine",
     ) as HTMLElement;
     expect(gridWrapper.style.height).toBe("100%");
     expect(gridWrapper.style.width).toBe("100%");

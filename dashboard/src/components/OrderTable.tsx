@@ -17,23 +17,23 @@ export interface OrderTableProps {
 
 const TERMINAL_STATUSES = new Set<OrderStatus>(["filled", "canceled", "rejected"]);
 
-/** Status badge color mapping */
+/** Status badge color mapping — 16% opacity backgrounds with darker text */
 function statusBadge(status: OrderStatus): { bg: string; text: string; label: string } {
   switch (status) {
     case "new":
-      return { bg: "rgba(59,130,246,0.2)", text: "#3b82f6", label: "New" };
+      return { bg: "rgba(113,50,245,0.16)", text: "#7132f5", label: "New" };
     case "acknowledged":
-      return { bg: "rgba(234,179,8,0.2)", text: "#eab308", label: "Ack" };
+      return { bg: "rgba(234,179,8,0.16)", text: "#eab308", label: "Ack" };
     case "partially_filled":
-      return { bg: "rgba(234,179,8,0.2)", text: "#eab308", label: "Partial" };
+      return { bg: "rgba(234,179,8,0.16)", text: "#eab308", label: "Partial" };
     case "filled":
-      return { bg: "rgba(34,197,94,0.2)", text: "#22c55e", label: "Filled" };
+      return { bg: "rgba(20,158,97,0.16)", text: "#149e61", label: "Filled" };
     case "canceled":
-      return { bg: "rgba(239,68,68,0.2)", text: "#ef4444", label: "Canceled" };
+      return { bg: "rgba(239,68,68,0.16)", text: "#ef4444", label: "Canceled" };
     case "rejected":
-      return { bg: "rgba(239,68,68,0.2)", text: "#ef4444", label: "Rejected" };
+      return { bg: "rgba(239,68,68,0.16)", text: "#ef4444", label: "Rejected" };
     default:
-      return { bg: "rgba(107,114,128,0.2)", text: "#6b7280", label: status };
+      return { bg: "rgba(148,151,169,0.16)", text: "#9497a9", label: status };
   }
 }
 
@@ -218,7 +218,7 @@ export function buildColumnDefs(
                 padding: "0",
                 cursor: "pointer",
                 fontSize: "11px",
-                fontFamily: terminalTheme.fonts.mono,
+                fontFamily: terminalTheme.fonts.sans,
                 transition: "color 0.15s",
               }}
               onMouseEnter={(e) => {
@@ -266,7 +266,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       resizable: true,
       suppressMovable: true,
       cellStyle: {
-        fontFamily: terminalTheme.fonts.mono,
+        fontFamily: terminalTheme.fonts.sans,
         fontSize: "12px",
         color: terminalTheme.colors.text.secondary,
       },
@@ -278,7 +278,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
 
   return (
     <div
-      className="ag-theme-alpine-dark"
+      className="ag-theme-alpine"
       style={{
         width: "100%",
         height: "100%",
@@ -291,7 +291,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
         "--ag-border-color": terminalTheme.colors.border,
         "--ag-row-border-color": `${terminalTheme.colors.border}80`,
         "--ag-header-column-separator-color": terminalTheme.colors.border,
-        "--ag-font-family": terminalTheme.fonts.mono,
+        "--ag-font-family": terminalTheme.fonts.sans,
         "--ag-font-size": "12px",
         "--ag-row-height": "36px",
         "--ag-header-height": "36px",
@@ -313,7 +313,7 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
         noRowsOverlayComponent={() => (
           <div
             style={{
-              fontFamily: terminalTheme.fonts.mono,
+              fontFamily: terminalTheme.fonts.sans,
               fontSize: "12px",
               color: terminalTheme.colors.text.muted,
               padding: "40px 0",

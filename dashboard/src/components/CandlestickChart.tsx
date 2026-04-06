@@ -44,7 +44,7 @@ export function CandlestickChart({
       layout: {
         background: { type: ColorType.Solid, color: terminalTheme.colors.bg.primary },
         textColor: terminalTheme.colors.text.muted,
-        fontFamily: terminalTheme.fonts.mono,
+        fontFamily: terminalTheme.fonts.sans,
         fontSize: 11,
       },
       grid: {
@@ -115,7 +115,7 @@ export function CandlestickChart({
       {!hasData && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className="font-mono text-xs animate-pulse"
+            className="text-xs animate-pulse"
             style={{ color: terminalTheme.colors.text.muted }}
           >
             Waiting for market data...

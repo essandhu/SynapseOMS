@@ -15,18 +15,9 @@ export function TerminalLayout() {
 
   return (
     <div className="relative flex h-screen flex-col bg-bg-primary font-sans text-text-primary">
-      {/* Scanline overlay */}
-      <div
-        className="pointer-events-none absolute inset-0 z-50"
-        style={{
-          background:
-            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px)",
-        }}
-      />
-
       {/* Top bar */}
       <header className="z-10 flex items-center border-b border-border px-3 py-2">
-        <h1 className="mr-8 font-mono text-sm font-semibold tracking-wider text-accent-blue">
+        <h1 className="mr-8 text-sm font-semibold tracking-wider text-accent-blue">
           SynapseOMS
         </h1>
         <nav className="flex gap-1">
@@ -65,11 +56,11 @@ export function TerminalLayout() {
 
       {/* Bottom status bar */}
       <footer className="z-10 flex items-center border-t border-border px-3 py-1">
-        <span className="flex items-center gap-2 font-mono text-xs text-text-muted">
+        <span className="flex items-center gap-2 text-xs text-text-muted">
           <span className="inline-block h-2 w-2 animate-status-pulse rounded-full bg-accent-green" />
           Connected
         </span>
-        <span className="ml-auto font-mono text-xs text-text-muted">
+        <span className="ml-auto text-xs text-text-muted">
           SynapseOMS v0.1.0
         </span>
       </footer>

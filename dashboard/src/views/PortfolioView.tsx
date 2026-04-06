@@ -29,7 +29,7 @@ function formatCurrency(value: string | number): string {
 }
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
-  equity: "#3b82f6",
+  equity: "#7132f5",
   crypto: "#f97316",
   tokenized_security: "#a855f7",
   future: "#14b8a6",
@@ -37,8 +37,8 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
 };
 
 const VENUE_COLORS = [
-  "#3b82f6",
-  "#22c55e",
+  "#7132f5",
+  "#149e61",
   "#f97316",
   "#a855f7",
   "#14b8a6",
@@ -64,18 +64,18 @@ function SummaryCard({
   loading,
 }: SummaryCardProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border bg-bg-secondary px-4 py-3">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-bg-secondary px-4 py-3" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
+      <span className="text-[10px] uppercase tracking-wider text-text-muted">
         {label}
       </span>
       {loading ? (
-        <span className="font-mono text-lg text-text-muted animate-pulse">
+        <span className="text-lg text-text-muted animate-pulse">
           --
         </span>
       ) : (
         <div className="flex items-center gap-1.5">
           {icon}
-          <span className={`font-mono text-lg font-semibold ${valueClass}`}>
+          <span className={`text-lg font-semibold ${valueClass}`}>
             {value}
           </span>
         </div>
@@ -134,7 +134,7 @@ function VenueTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg">
+    <div className="rounded border border-border bg-bg-secondary px-3 py-2 text-xs" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
       <span className="text-text-primary">{d.venueId}</span>
       <span className="ml-2 text-text-muted">{d.percentage.toFixed(1)}%</span>
     </div>
@@ -202,9 +202,6 @@ export function PortfolioView() {
 
   // Compute NAV client-side from live positions + availableCash so it
   // updates in real-time as market prices change via WebSocket.
-  // Uses availableCash (not cash) to avoid double-counting unsettled T+2
-  // equity purchases where cash hasn't been debited yet but the position
-  // already exists.
   const totalNav = useMemo(() => {
     if (availableCash === undefined) return undefined;
     const posMarketValue = positionList.reduce((acc, p) => {
@@ -227,10 +224,7 @@ export function PortfolioView() {
     return () => clearInterval(interval);
   }, []);
 
-  // Compute exposure from live position data so it always reflects current
-  // positions even when the risk engine's Kafka pipeline is unavailable.
-  // We serialize to a stable key so the chart only re-renders when rounded
-  // percentages actually change (not on every WS tick).
+  // Compute exposure from live position data
   const assetClassRaw = useMemo(() => {
     if (positionList.length === 0) return [];
     const groups: Record<string, number> = {};
@@ -246,7 +240,7 @@ export function PortfolioView() {
       .map(([name, value]) => ({
         name,
         value: Math.round((value / total) * 1000) / 10,
-        color: ASSET_CLASS_COLORS[name] ?? "#6b7280",
+        color: ASSET_CLASS_COLORS[name] ?? "#9497a9",
       }));
   }, [positionList]);
 
@@ -280,16 +274,16 @@ export function PortfolioView() {
     <div className="flex flex-col gap-4">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Portfolio
         </h2>
         {posLoading && (
-          <span className="font-mono text-xs text-text-muted">Loading...</span>
+          <span className="text-xs text-text-muted">Loading...</span>
         )}
       </div>
 
       {posError && (
-        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
+        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs text-accent-red">
           {posError}
         </div>
       )}
@@ -338,12 +332,12 @@ export function PortfolioView() {
       <div className="grid grid-cols-2 gap-3">
         {/* Asset Class Donut */}
         <div className="rounded-lg border border-border bg-bg-secondary px-4 py-3">
-          <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+          <h3 className="mb-2 text-[10px] uppercase tracking-wider text-text-muted">
             Exposure by Asset Class
           </h3>
           <div className="relative h-48">
             {posLoading ? (
-              <div className="flex h-full items-center justify-center font-mono text-xs text-text-muted animate-pulse">
+              <div className="flex h-full items-center justify-center text-xs text-text-muted animate-pulse">
                 Loading...
               </div>
             ) : (
@@ -354,7 +348,7 @@ export function PortfolioView() {
                   {assetClassData.map((d) => (
                     <div
                       key={d.name}
-                      className="flex items-center gap-1 font-mono text-[10px] text-text-muted"
+                      className="flex items-center gap-1 text-[10px] text-text-muted"
                     >
                       <span
                         className="inline-block h-2 w-2 rounded-full"
@@ -371,16 +365,16 @@ export function PortfolioView() {
 
         {/* Venue Bar Chart */}
         <div className="rounded-lg border border-border bg-bg-secondary px-4 py-3">
-          <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+          <h3 className="mb-2 text-[10px] uppercase tracking-wider text-text-muted">
             Exposure by Venue
           </h3>
           <div className="h-48">
             {posLoading ? (
-              <div className="flex h-full items-center justify-center font-mono text-xs text-text-muted animate-pulse">
+              <div className="flex h-full items-center justify-center text-xs text-text-muted animate-pulse">
                 Loading...
               </div>
             ) : venueData.length === 0 ? (
-              <div className="flex h-full items-center justify-center font-mono text-xs text-text-muted">
+              <div className="flex h-full items-center justify-center text-xs text-text-muted">
                 No venue data
               </div>
             ) : (
@@ -393,7 +387,7 @@ export function PortfolioView() {
                   <XAxis
                     type="number"
                     domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: "#6b7280", fontFamily: "monospace" }}
+                    tick={{ fontSize: 10, fill: "#9497a9", fontFamily: "'IBM Plex Sans', sans-serif" }}
                     tickFormatter={(v: number) => `${v}%`}
                     axisLine={false}
                     tickLine={false}
@@ -402,11 +396,11 @@ export function PortfolioView() {
                     type="category"
                     dataKey="venueId"
                     width={80}
-                    tick={{ fontSize: 10, fill: "#9ca3af", fontFamily: "monospace" }}
+                    tick={{ fontSize: 10, fill: "#686b82", fontFamily: "'IBM Plex Sans', sans-serif" }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={<VenueTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                  <Tooltip content={<VenueTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
                   <Bar dataKey="percentage" radius={[0, 4, 4, 0]} barSize={18}>
                     {venueData.map((_, i) => (
                       <Cell
@@ -424,7 +418,7 @@ export function PortfolioView() {
 
       {/* ── Position Table ─────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Positions
         </h3>
         <PositionTable positions={positionList} totalNav={totalNav} />

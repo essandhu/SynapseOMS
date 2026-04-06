@@ -236,7 +236,8 @@ export function VenueCard({
 
   return (
     <div
-      className={`flex flex-col gap-3 rounded-lg border border-border bg-bg-secondary p-4 transition-all hover:border-gray-600 ${expanded ? "ring-1 ring-accent-blue/20" : ""}`}
+      className={`flex flex-col gap-3 rounded-lg border border-border bg-bg-secondary p-4 transition-all hover:border-[#9497a9] ${expanded ? "ring-1 ring-accent-blue/20" : ""}`}
+      style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}
     >
       {/* Header: name + status (clickable for expand) */}
       <div
@@ -269,12 +270,12 @@ export function VenueCard({
                 d={typeIcon}
               />
             </svg>
-            <h3 className="truncate font-mono text-base font-semibold text-text-primary">
+            <h3 className="truncate text-base font-semibold text-text-primary">
               {venue.name}
             </h3>
           </div>
           <span
-            className={`mt-1 inline-block rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${typeColor}`}
+            className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${typeColor}`}
           >
             {venue.type.replace("_", " ")}
           </span>
@@ -284,7 +285,7 @@ export function VenueCard({
             <span
               className={`inline-block h-2 w-2 rounded-full ${status.dotClass}`}
             />
-            <span className={`font-mono text-xs ${status.color}`}>
+            <span className={`text-xs ${status.color}`}>
               {status.label}
             </span>
           </div>
@@ -310,7 +311,7 @@ export function VenueCard({
         {venue.supportedAssets.map((ac) => (
           <span
             key={ac}
-            className="rounded border border-border bg-bg-tertiary px-1.5 py-0.5 font-mono text-[10px] text-text-secondary"
+            className="rounded border border-border bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-text-secondary"
           >
             {ASSET_CLASS_LABELS[ac] ?? ac}
           </span>
@@ -318,7 +319,7 @@ export function VenueCard({
       </div>
 
       {/* Fill rate */}
-      <div className="font-mono text-xs text-text-muted">
+      <div className="text-xs text-text-muted">
         <span className="text-text-secondary">Fill Rate:</span>{" "}
         <span className={fillRateColor(venue.fillRate ?? 0)} data-testid="fill-rate">
           {((venue.fillRate ?? 0) * 100).toFixed(1)}%
@@ -328,7 +329,7 @@ export function VenueCard({
       {/* Latency + sparkline (when connected) */}
       {isConnected && (
         <div className="flex items-center justify-between gap-2">
-          <div className="font-mono text-xs text-text-muted">
+          <div className="text-xs text-text-muted">
             <span className="text-text-secondary">P50:</span>{" "}
             <span className="text-accent-green">{venue.latencyP50Ms}ms</span>
             <span className="mx-1.5 text-border">|</span>
@@ -343,13 +344,13 @@ export function VenueCard({
 
       {/* Last heartbeat */}
       {venue.lastHeartbeat && (
-        <div className="font-mono text-[11px] text-text-muted">
+        <div className="text-[11px] text-text-muted">
           Heartbeat: {formatRelativeTime(venue.lastHeartbeat)}
         </div>
       )}
 
       {/* Credentials indicator */}
-      <div className="flex items-center gap-1.5 font-mono text-xs">
+      <div className="flex items-center gap-1.5 text-xs">
         {venue.hasCredentials ? (
           <>
             <svg
@@ -389,7 +390,7 @@ export function VenueCard({
 
       {/* Test connection result */}
       {testLatency !== null && (
-        <div className="rounded border border-accent-blue/20 bg-accent-blue/5 px-2 py-1 font-mono text-xs text-accent-blue" data-testid="test-latency-result">
+        <div className="rounded border border-accent-blue/20 bg-accent-blue/5 px-2 py-1 text-xs text-accent-blue" data-testid="test-latency-result">
           Round-trip: {testLatency}ms
         </div>
       )}
@@ -403,46 +404,46 @@ export function VenueCard({
         data-testid="drill-down-section"
       >
         <div className="border-t border-border pt-3">
-          <h4 className="mb-2 font-mono text-xs font-semibold text-text-secondary">
+          <h4 className="mb-2 text-xs font-semibold text-text-secondary">
             Venue Metrics
           </h4>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded border border-border bg-bg-tertiary px-2 py-1.5">
-              <div className="font-mono text-[10px] text-text-muted">
+              <div className="text-[10px] text-text-muted">
                 Orders
               </div>
-              <div className="font-mono text-sm font-medium text-text-primary" data-testid="order-count">
+              <div className="text-sm font-medium text-text-primary" data-testid="order-count">
                 {drillDown.orderCount.toLocaleString()}
               </div>
             </div>
             <div className="rounded border border-border bg-bg-tertiary px-2 py-1.5">
-              <div className="font-mono text-[10px] text-text-muted">
+              <div className="text-[10px] text-text-muted">
                 Fills
               </div>
-              <div className="font-mono text-sm font-medium text-accent-green">
+              <div className="text-sm font-medium text-accent-green">
                 {drillDown.fillCount.toLocaleString()}
               </div>
             </div>
             <div className="rounded border border-border bg-bg-tertiary px-2 py-1.5">
-              <div className="font-mono text-[10px] text-text-muted">
+              <div className="text-[10px] text-text-muted">
                 Rejects
               </div>
-              <div className="font-mono text-sm font-medium text-accent-red">
+              <div className="text-sm font-medium text-accent-red">
                 {drillDown.rejectCount.toLocaleString()}
               </div>
             </div>
             <div className="rounded border border-border bg-bg-tertiary px-2 py-1.5">
-              <div className="font-mono text-[10px] text-text-muted">
+              <div className="text-[10px] text-text-muted">
                 Avg Fill Time
               </div>
-              <div className="font-mono text-sm font-medium text-text-primary">
+              <div className="text-sm font-medium text-text-primary">
                 {drillDown.avgFillTimeMs}ms
               </div>
             </div>
           </div>
 
           {/* Partial fill rate */}
-          <div className="mt-2 font-mono text-xs text-text-muted">
+          <div className="mt-2 text-xs text-text-muted">
             <span className="text-text-secondary">Partial Fill Rate:</span>{" "}
             <span className={fillRateColor(drillDown.partialFillRate)}>
               {(drillDown.partialFillRate * 100).toFixed(1)}%
@@ -452,7 +453,7 @@ export function VenueCard({
           {/* Historical latency mini-chart (wider in drill-down) */}
           {latencyHistory.length >= 2 && (
             <div className="mt-3">
-              <div className="mb-1 font-mono text-[10px] text-text-muted">
+              <div className="mb-1 text-[10px] text-text-muted">
                 Latency History (last {latencyHistory.length} samples)
               </div>
               <div className="rounded border border-border bg-bg-tertiary p-2">
@@ -472,7 +473,7 @@ export function VenueCard({
         {isConnected ? (
           <button
             onClick={onDisconnect}
-            className="flex-1 rounded border border-accent-red/30 bg-accent-red/10 px-3 py-1.5 font-mono text-xs font-medium text-accent-red transition-colors hover:bg-accent-red/20"
+            className="flex-1 rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-1.5 text-xs font-medium text-accent-red transition-colors hover:bg-accent-red/20"
           >
             Disconnect
           </button>
@@ -480,7 +481,7 @@ export function VenueCard({
           <button
             onClick={onConnect}
             disabled={!venue.hasCredentials}
-            className="flex-1 rounded border border-accent-green/30 bg-accent-green/10 px-3 py-1.5 font-mono text-xs font-medium text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex-1 rounded-xl border border-accent-green/30 bg-accent-green/10 px-3 py-1.5 text-xs font-medium text-accent-green transition-colors hover:bg-accent-green/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Connect
           </button>
@@ -488,7 +489,7 @@ export function VenueCard({
         <button
           onClick={handleTest}
           disabled={testing || !venue.hasCredentials}
-          className="flex-1 rounded border border-accent-blue/30 bg-accent-blue/10 px-3 py-1.5 font-mono text-xs font-medium text-accent-blue transition-colors hover:bg-accent-blue/20 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex-1 rounded-xl border border-accent-blue/30 bg-accent-blue/10 px-3 py-1.5 text-xs font-medium text-accent-blue transition-colors hover:bg-accent-blue/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {testing ? "Testing..." : "Test Connection"}
         </button>

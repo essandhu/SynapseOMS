@@ -68,9 +68,9 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
           <div key={step} className="flex items-center gap-2">
             <div
               className={[
-                "flex h-8 w-8 items-center justify-center rounded-full font-mono text-xs font-bold transition-all duration-300",
+                "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-300",
                 isActive
-                  ? "bg-accent-blue text-white shadow-[0_0_12px_rgba(59,130,246,0.4)]"
+                  ? "bg-accent-blue text-white shadow-[0_0_12px_rgba(113,50,245,0.4)]"
                   : isCompleted
                     ? "bg-accent-green/20 text-accent-green"
                     : "bg-bg-tertiary text-text-muted",
@@ -166,7 +166,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <Shield className="h-8 w-8 text-accent-blue" />
         </div>
 
-        <h1 className="font-mono text-3xl font-bold tracking-tight text-text-primary">
+        <h1 className="text-3xl font-bold tracking-tight text-text-primary">
           Welcome to SynapseOMS
         </h1>
 
@@ -193,7 +193,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
         <button
           type="button"
           onClick={() => setStep(2)}
-          className="mt-10 flex items-center gap-2 rounded-lg bg-accent-blue px-8 py-3 font-mono text-sm font-semibold text-white shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-all hover:bg-accent-blue/90 hover:shadow-[0_0_24px_rgba(59,130,246,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
+          className="mt-10 flex items-center gap-2 rounded-xl bg-accent-blue px-8 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(113,50,245,0.25)] transition-all hover:bg-accent-blue/90 hover:shadow-[0_0_24px_rgba(113,50,245,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-blue/50"
         >
           Get Started
           <ChevronRight className="h-4 w-4" />
@@ -211,7 +211,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <Lock className="h-6 w-6 text-accent-purple" />
         </div>
 
-        <h2 className="font-mono text-xl font-semibold text-text-primary">
+        <h2 className="text-xl font-semibold text-text-primary">
           Set Master Passphrase
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-text-muted">
@@ -224,7 +224,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <div>
             <label
               htmlFor="passphrase"
-              className="mb-1.5 block font-mono text-xs font-medium text-text-secondary"
+              className="mb-1.5 block text-xs font-medium text-text-secondary"
             >
               Passphrase
             </label>
@@ -235,7 +235,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
                 placeholder="Enter a strong passphrase"
-                className="w-full rounded-md border border-border bg-bg-primary px-3 py-2.5 pr-10 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                className="w-full rounded-md border border-border bg-bg-primary px-3 py-2.5 pr-10 text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue"
               />
               <button
                 type="button"
@@ -260,7 +260,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                   className={`h-full rounded-full transition-all duration-300 ${strengthInfo.barColor} ${strengthInfo.width}`}
                 />
               </div>
-              <p className={`font-mono text-xs ${strengthInfo.color}`}>
+              <p className={`text-xs ${strengthInfo.color}`}>
                 {strengthInfo.label}
                 {strength === "weak" && " \u2014 try adding numbers and symbols"}
               </p>
@@ -271,7 +271,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <div>
             <label
               htmlFor="confirm-passphrase"
-              className="mb-1.5 block font-mono text-xs font-medium text-text-secondary"
+              className="mb-1.5 block text-xs font-medium text-text-secondary"
             >
               Confirm Passphrase
             </label>
@@ -283,7 +283,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                 onChange={(e) => setConfirmPassphrase(e.target.value)}
                 placeholder="Re-enter passphrase"
                 className={[
-                  "w-full rounded-md border bg-bg-primary px-3 py-2.5 pr-10 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-1",
+                  "w-full rounded-md border bg-bg-primary px-3 py-2.5 pr-10 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-1",
                   confirmPassphrase.length > 0 && confirmPassphrase !== passphrase
                     ? "border-accent-red focus:border-accent-red focus:ring-accent-red"
                     : "border-border focus:border-accent-blue focus:ring-accent-blue",
@@ -303,7 +303,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
               </button>
             </div>
             {confirmPassphrase.length > 0 && confirmPassphrase !== passphrase && (
-              <p className="mt-1 font-mono text-xs text-accent-red">
+              <p className="mt-1 text-xs text-accent-red">
                 Passphrases do not match
               </p>
             )}
@@ -324,7 +324,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
             type="button"
             onClick={() => setStep(3)}
             disabled={!passphraseValid}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent-blue px-6 py-2.5 font-mono text-sm font-semibold text-white transition-all hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent-blue px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Set Passphrase
             <ChevronRight className="h-4 w-4" />
@@ -356,7 +356,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
   function renderChooseVenue() {
     return (
       <div className="mx-auto w-full max-w-lg">
-        <h2 className="font-mono text-xl font-semibold text-text-primary">
+        <h2 className="text-xl font-semibold text-text-primary">
           Choose Your Venue
         </h2>
         <p className="mt-2 text-sm text-text-muted">
@@ -374,7 +374,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                 className={[
                   "group flex w-full items-start gap-4 rounded-lg border p-4 text-left transition-all duration-200",
                   isSelected
-                    ? "border-accent-blue bg-accent-blue/5 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
+                    ? "border-accent-blue bg-accent-blue/5 shadow-[0_0_12px_rgba(113,50,245,0.15)]"
                     : "border-border bg-bg-secondary hover:border-text-muted/30 hover:bg-bg-tertiary/50",
                 ].join(" ")}
               >
@@ -390,12 +390,12 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-text-primary">
+                    <span className="text-sm font-semibold text-text-primary">
                       {venue.title}
                     </span>
                     <span
                       className={[
-                        "rounded-full px-2 py-0.5 font-mono text-[10px] font-medium",
+                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
                         venue.id === "sim-exchange"
                           ? "bg-accent-green/10 text-accent-green"
                           : "bg-accent-yellow/10 text-accent-yellow",
@@ -444,7 +444,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
               }
             }}
             disabled={!selectedVenue}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent-blue px-6 py-2.5 font-mono text-sm font-semibold text-white transition-all hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent-blue px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-blue/90 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {selectedVenue === "sim-exchange" ? "Skip to Finish" : "Continue"}
             <ChevronRight className="h-4 w-4" />
@@ -471,7 +471,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <Rocket className="h-8 w-8 text-accent-green" />
         </div>
 
-        <h1 className="font-mono text-3xl font-bold tracking-tight text-text-primary">
+        <h1 className="text-3xl font-bold tracking-tight text-text-primary">
           You&apos;re all set!
         </h1>
 
@@ -492,7 +492,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
               className="rounded-lg border border-border bg-bg-secondary px-4 py-3"
             >
               <Icon className="mx-auto mb-2 h-5 w-5 text-accent-green" />
-              <span className="font-mono text-[11px] text-text-muted">{label}</span>
+              <span className="text-[11px] text-text-muted">{label}</span>
             </div>
           ))}
         </div>
@@ -509,7 +509,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
           <button
             type="button"
             onClick={finishOnboarding}
-            className="flex items-center gap-2 rounded-lg bg-accent-green px-8 py-3 font-mono text-sm font-semibold text-white shadow-[0_0_20px_rgba(34,197,94,0.25)] transition-all hover:bg-accent-green/90 hover:shadow-[0_0_24px_rgba(34,197,94,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-green/50"
+            className="flex items-center gap-2 rounded-xl bg-accent-green px-8 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(20,158,97,0.25)] transition-all hover:bg-accent-green/90 hover:shadow-[0_0_24px_rgba(20,158,97,0.35)] focus:outline-none focus:ring-2 focus:ring-accent-green/50"
           >
             Open Trading Terminal
             <ChevronRight className="h-4 w-4" />
@@ -531,21 +531,12 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
 
   return (
     <div className="relative flex min-h-screen flex-col bg-bg-primary font-sans text-text-primary">
-      {/* Scanline overlay — same as TerminalLayout */}
-      <div
-        className="pointer-events-none absolute inset-0 z-50"
-        style={{
-          background:
-            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px)",
-        }}
-      />
-
       {/* Header */}
       <header className="z-10 flex items-center border-b border-border px-4 py-3">
-        <h1 className="font-mono text-sm font-semibold tracking-wider text-accent-blue">
+        <h1 className="text-sm font-semibold tracking-wider text-accent-blue">
           SynapseOMS
         </h1>
-        <span className="ml-3 rounded-full bg-accent-blue/10 px-2.5 py-0.5 font-mono text-[10px] font-medium text-accent-blue">
+        <span className="ml-3 rounded-full bg-accent-blue/10 px-2.5 py-0.5 text-[10px] font-medium text-accent-blue">
           Setup
         </span>
       </header>
@@ -563,7 +554,7 @@ export function OnboardingView({ onComplete }: { onComplete?: () => void } = {})
 
       {/* Footer */}
       <footer className="z-10 flex items-center justify-center border-t border-border px-4 py-2">
-        <span className="font-mono text-xs text-text-muted">
+        <span className="text-xs text-text-muted">
           SynapseOMS v0.1.0
         </span>
       </footer>
