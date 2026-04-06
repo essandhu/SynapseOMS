@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { useThemeColors } from "../theme/terminal";
 
 interface DrawdownChartProps {
   data: { date: string; drawdown: number }[];
@@ -40,6 +41,7 @@ function CustomTooltip({
 }
 
 export function DrawdownChart({ data, currentDrawdown }: DrawdownChartProps) {
+  const theme = useThemeColors();
   if (!data.length) {
     return (
       <div className="rounded border border-border bg-bg-secondary p-4">
@@ -87,25 +89,25 @@ export function DrawdownChart({ data, currentDrawdown }: DrawdownChartProps) {
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="#f0f1f3"
+            stroke={theme.colors.bg.tertiary}
             vertical={false}
           />
           <XAxis
             dataKey="date"
             tickFormatter={formatDate}
-            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
-            axisLine={{ stroke: "#dedee5" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
-            axisLine={{ stroke: "#dedee5" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
             tickFormatter={(v: number) => `${v}%`}
             domain={["dataMin - 1", 0]}
           />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={0} stroke="#dedee5" strokeWidth={1} />
+          <ReferenceLine y={0} stroke={theme.colors.border} strokeWidth={1} />
           <Area
             type="monotone"
             dataKey="drawdown"

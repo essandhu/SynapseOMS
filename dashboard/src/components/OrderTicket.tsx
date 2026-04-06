@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import type { AssetClass, Instrument, OrderSide, OrderType, Position, SubmitOrderRequest, Venue } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const SMART_ROUTE_ID = "smart";
 
@@ -23,6 +24,7 @@ function netPositionForInstrument(positions: Position[], instrumentId: string): 
 }
 
 export function OrderTicket({ instruments, venues = [], positions = [], onSubmit }: OrderTicketProps) {
+  const theme = useThemeColors();
   const [instrumentId, setInstrumentId] = useState("");
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("market");
@@ -246,9 +248,9 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
             onClick={() => setSide("buy")}
             className="flex-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors"
             style={{
-              backgroundColor: side === "buy" ? "#149e61" : undefined,
-              color: side === "buy" ? "#ffffff" : "#149e61",
-              border: `1px solid #149e61`,
+              backgroundColor: side === "buy" ? theme.colors.accent.green : undefined,
+              color: side === "buy" ? "#fff" : theme.colors.accent.green,
+              border: `1px solid ${theme.colors.accent.green}`,
             }}
           >
             Buy
@@ -258,9 +260,9 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
             onClick={() => setSide("sell")}
             className="flex-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors"
             style={{
-              backgroundColor: side === "sell" ? "#ef4444" : undefined,
-              color: side === "sell" ? "#ffffff" : "#ef4444",
-              border: `1px solid #ef4444`,
+              backgroundColor: side === "sell" ? theme.colors.accent.red : undefined,
+              color: side === "sell" ? "#fff" : theme.colors.accent.red,
+              border: `1px solid ${theme.colors.accent.red}`,
             }}
           >
             Sell
@@ -287,9 +289,9 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
               className="flex-1 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
                 backgroundColor:
-                  orderType === t ? "#7132f5" : "transparent",
-                color: orderType === t ? "#ffffff" : "#9497a9",
-                border: `1px solid ${orderType === t ? "#7132f5" : "#dedee5"}`,
+                  orderType === t ? theme.colors.accent.blue : "transparent",
+                color: orderType === t ? "#fff" : theme.colors.text.muted,
+                border: `1px solid ${orderType === t ? theme.colors.accent.blue : theme.colors.border}`,
               }}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -355,8 +357,8 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
         disabled={submitting}
         className="rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
         style={{
-          backgroundColor: side === "buy" ? "#149e61" : "#ef4444",
-          color: "#ffffff",
+          backgroundColor: side === "buy" ? theme.colors.accent.green : theme.colors.accent.red,
+          color: "#fff",
         }}
       >
         {submitting ? "Submitting..." : "Submit Order"}

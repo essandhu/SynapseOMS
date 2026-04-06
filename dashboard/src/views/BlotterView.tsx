@@ -8,6 +8,7 @@ import { usePositionStore } from "../stores/positionStore";
 import { useMarketDataStore } from "../stores/marketDataStore";
 import { fetchInstruments } from "../api/rest";
 import type { Instrument, OrderStatus } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 type StatusFilter = "active" | "all" | "filled" | "canceled";
 
@@ -21,6 +22,7 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
 ];
 
 export function BlotterView() {
+  const theme = useThemeColors();
   const orders = useOrderStore((s) => s.orders);
   const loading = useOrderStore((s) => s.loading);
   const error = useOrderStore((s) => s.error);
@@ -104,9 +106,9 @@ export function BlotterView() {
                 className="rounded-xl px-3 py-1 text-xs font-medium transition-colors"
                 style={{
                   backgroundColor:
-                    filter === tab.key ? "rgba(113,50,245,0.16)" : "transparent",
-                  color: filter === tab.key ? "#7132f5" : "#9497a9",
-                  border: `1px solid ${filter === tab.key ? "rgba(113,50,245,0.3)" : "transparent"}`,
+                    filter === tab.key ? theme.colors.accent.blue + "29" : "transparent",
+                  color: filter === tab.key ? theme.colors.accent.blue : theme.colors.text.muted,
+                  border: `1px solid ${filter === tab.key ? theme.colors.accent.blue + "4D" : "transparent"}`,
                 }}
               >
                 {tab.label}
@@ -172,9 +174,9 @@ export function BlotterView() {
                   data-testid={`interval-${iv}`}
                   className="rounded-xl px-2 py-0.5 text-xs font-medium transition-colors"
                   style={{
-                    backgroundColor: chartInterval === iv ? "rgba(113,50,245,0.16)" : "transparent",
-                    color: chartInterval === iv ? "#7132f5" : "#9497a9",
-                    border: `1px solid ${chartInterval === iv ? "rgba(113,50,245,0.3)" : "transparent"}`,
+                    backgroundColor: chartInterval === iv ? theme.colors.accent.blue + "29" : "transparent",
+                    color: chartInterval === iv ? theme.colors.accent.blue : theme.colors.text.muted,
+                    border: `1px solid ${chartInterval === iv ? theme.colors.accent.blue + "4D" : "transparent"}`,
                   }}
                 >
                   {iv}

@@ -5,7 +5,8 @@ import type { ColDef, ICellRendererParams, GridReadyEvent, GridSizeChangedEvent,
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import type { Order, OrderStatus } from "../api/types";
-import { terminalTheme } from "../theme/terminal";
+import { useThemeColors, darkTheme, type TerminalTheme } from "../theme/terminal";
+import { useThemeStore } from "../stores/themeStore";
 
 // Register required modules
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
@@ -65,6 +66,7 @@ function formatTime(iso: string): string {
 /** Build column definitions for the order blotter grid. Exported for testing. */
 export function buildColumnDefs(
   onCancel: (orderId: string) => void,
+  theme: TerminalTheme = darkTheme,
 ): ColDef<Order>[] {
   return [
       {
@@ -80,7 +82,7 @@ export function buildColumnDefs(
         field: "instrumentId",
         minWidth: 100,
         width: 140,
-        cellStyle: { color: terminalTheme.colors.text.primary, fontWeight: "600" },
+        cellStyle: { color: theme.colors.text.primary, fontWeight: "600" },
       },
       {
         headerName: "Side",
@@ -94,8 +96,8 @@ export function buildColumnDefs(
             <span
               style={{
                 color: isBuy
-                  ? terminalTheme.colors.accent.green
-                  : terminalTheme.colors.accent.red,
+                  ? theme.colors.accent.green
+                  : theme.colors.accent.red,
                 fontWeight: 700,
                 textTransform: "uppercase",
               }}
@@ -135,7 +137,7 @@ export function buildColumnDefs(
           if (!params.data) return null;
           if (params.data.type === "market") {
             return (
-              <span style={{ color: terminalTheme.colors.text.muted, fontStyle: "italic" }}>
+              <span style={{ color: theme.colors.text.muted, fontStyle: "italic" }}>
                 MKT
               </span>
             );
@@ -192,7 +194,7 @@ export function buildColumnDefs(
         field: "venueId",
         minWidth: 80,
         flex: 1,
-        cellStyle: { color: terminalTheme.colors.text.secondary },
+        cellStyle: { color: theme.colors.text.secondary },
       },
       {
         headerName: "Action",
@@ -214,18 +216,18 @@ export function buildColumnDefs(
               style={{
                 background: "transparent",
                 border: "none",
-                color: terminalTheme.colors.text.muted,
+                color: theme.colors.text.muted,
                 padding: "0",
                 cursor: "pointer",
                 fontSize: "11px",
-                fontFamily: terminalTheme.fonts.sans,
+                fontFamily: theme.fonts.sans,
                 transition: "color 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = terminalTheme.colors.accent.red;
+                e.currentTarget.style.color = theme.colors.accent.red;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = terminalTheme.colors.text.muted;
+                e.currentTarget.style.color = theme.colors.text.muted;
               }}
             >
               Cancel
@@ -237,6 +239,8 @@ export function buildColumnDefs(
 }
 
 export function OrderTable({ orders, onCancel }: OrderTableProps) {
+  const theme = useThemeColors();
+  const mode = useThemeStore((s) => s.mode);
   const gridRef = useRef<AgGridReact<Order>>(null);
   const gridApiRef = useRef<GridApi<Order> | null>(null);
 
@@ -256,8 +260,8 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
   }, []);
 
   const columnDefs = useMemo(
-    () => buildColumnDefs(onCancel),
-    [onCancel],
+    () => buildColumnDefs(onCancel, theme),
+    [onCancel, theme],
   );
 
   const defaultColDef = useMemo<ColDef>(
@@ -266,37 +270,38 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
       resizable: true,
       suppressMovable: true,
       cellStyle: {
-        fontFamily: terminalTheme.fonts.sans,
+        fontFamily: theme.fonts.sans,
         fontSize: "12px",
-        color: terminalTheme.colors.text.secondary,
+        color: theme.colors.text.secondary,
       },
     }),
-    [],
+    [theme],
   );
 
   const getRowId = useCallback((params: { data: Order }) => params.data.id, []);
+  const gridThemeClass = mode === "dark" ? "ag-theme-alpine-dark" : "ag-theme-alpine";
 
   return (
     <div
-      className="ag-theme-alpine"
+      className={gridThemeClass}
       style={{
         width: "100%",
         height: "100%",
         minHeight: 300,
-        "--ag-background-color": terminalTheme.colors.bg.primary,
-        "--ag-odd-row-background-color": terminalTheme.colors.bg.secondary,
-        "--ag-header-background-color": terminalTheme.colors.bg.tertiary,
-        "--ag-header-foreground-color": terminalTheme.colors.text.muted,
-        "--ag-foreground-color": terminalTheme.colors.text.secondary,
-        "--ag-border-color": terminalTheme.colors.border,
-        "--ag-row-border-color": `${terminalTheme.colors.border}80`,
-        "--ag-header-column-separator-color": terminalTheme.colors.border,
-        "--ag-font-family": terminalTheme.fonts.sans,
+        "--ag-background-color": theme.colors.bg.primary,
+        "--ag-odd-row-background-color": theme.colors.bg.secondary,
+        "--ag-header-background-color": theme.colors.bg.tertiary,
+        "--ag-header-foreground-color": theme.colors.text.muted,
+        "--ag-foreground-color": theme.colors.text.secondary,
+        "--ag-border-color": theme.colors.border,
+        "--ag-row-border-color": `${theme.colors.border}80`,
+        "--ag-header-column-separator-color": theme.colors.border,
+        "--ag-font-family": theme.fonts.sans,
         "--ag-font-size": "12px",
         "--ag-row-height": "36px",
         "--ag-header-height": "36px",
-        "--ag-selected-row-background-color": `${terminalTheme.colors.accent.blue}15`,
-        "--ag-row-hover-color": `${terminalTheme.colors.bg.tertiary}80`,
+        "--ag-selected-row-background-color": `${theme.colors.accent.blue}15`,
+        "--ag-row-hover-color": `${theme.colors.bg.tertiary}80`,
       } as React.CSSProperties}
     >
       <AgGridReact<Order>
@@ -313,9 +318,9 @@ export function OrderTable({ orders, onCancel }: OrderTableProps) {
         noRowsOverlayComponent={() => (
           <div
             style={{
-              fontFamily: terminalTheme.fonts.sans,
+              fontFamily: theme.fonts.sans,
               fontSize: "12px",
-              color: terminalTheme.colors.text.muted,
+              color: theme.colors.text.muted,
               padding: "40px 0",
             }}
           >

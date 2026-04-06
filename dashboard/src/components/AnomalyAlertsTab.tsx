@@ -56,11 +56,11 @@ function AlertCard({
 
   return (
     <div
-      className={`bg-[#f8f9fa] rounded-lg p-4 transition-opacity ${
+      className={`bg-bg-secondary rounded-lg p-4 transition-opacity ${
         isAcknowledged ? "opacity-50" : ""
       }`}
       style={{
-        borderLeft: isAcknowledged ? "3px solid #dedee5" : `3px solid ${color}`,
+        borderLeft: isAcknowledged ? "3px solid var(--border-color)" : `3px solid ${color}`,
       }}
       data-testid="alert-card"
     >
@@ -74,35 +74,35 @@ function AlertCard({
           >
             {alert.severity}
           </span>
-          <span className="text-[#101114] text-sm font-medium">
+          <span className="text-text-primary text-sm font-medium">
             {alert.instrumentId}
           </span>
-          <span className="text-[#9497a9] text-sm">{alert.venueId}</span>
+          <span className="text-text-muted text-sm">{alert.venueId}</span>
         </div>
-        <span className="text-[#9497a9] text-xs">
+        <span className="text-text-muted text-xs">
           {relativeTime(alert.timestamp)}
         </span>
       </div>
 
-      <p className="text-[#686b82] text-sm mt-2">{alert.description}</p>
+      <p className="text-text-secondary text-sm mt-2">{alert.description}</p>
 
       {/* Feature breakdown */}
       <div className="flex flex-wrap gap-3 mt-2">
         {Object.entries(alert.features).map(([key, value]) => (
-          <span key={key} className="text-xs text-[#9497a9]">
-            {key}: <span className="text-[#686b82]">{value.toFixed(2)}</span>
+          <span key={key} className="text-xs text-text-muted">
+            {key}: <span className="text-text-secondary">{value.toFixed(2)}</span>
           </span>
         ))}
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <span className="text-xs text-[#9497a9]">
+        <span className="text-xs text-text-muted">
           Score: {alert.anomalyScore.toFixed(3)}
         </span>
         {!isAcknowledged && (
           <button
             onClick={onAcknowledge}
-            className="text-xs text-[#686b82] hover:text-[#101114] border border-[#dedee5] rounded px-2 py-1"
+            className="text-xs text-text-secondary hover:text-text-primary border border-border rounded px-2 py-1"
             data-testid="acknowledge-btn"
           >
             Acknowledge

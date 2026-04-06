@@ -1,36 +1,61 @@
 @import "tailwindcss";
 
+/* ── Base CSS variables (light mode) ──────────────────────────────── */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f0f1f3;
+  --text-primary: #101114;
+  --text-secondary: #686b82;
+  --text-muted: #9497a9;
+  --accent-blue: #7132f5;
+  --accent-green: #149e61;
+  --accent-red: #ef4444;
+  --accent-yellow: #eab308;
+  --accent-purple: #7132f5;
+  --border-color: #dedee5;
+}
+
+/* ── Dark mode overrides ──────────────────────────────────────────── */
+:root.dark {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --accent-blue: #7132f5;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-yellow: #eab308;
+  --accent-purple: #7132f5;
+  --border-color: #374151;
+}
+
+/* ── Tailwind design tokens (resolve from CSS variables) ──────────── */
 @theme {
-  /* Background colors */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f8f9fa;
-  --color-bg-tertiary: #f0f1f3;
-
-  /* Text colors */
-  --color-text-primary: #101114;
-  --color-text-secondary: #686b82;
-  --color-text-muted: #9497a9;
-
-  /* Accent colors */
-  --color-accent-blue: #7132f5;
-  --color-accent-green: #149e61;
-  --color-accent-red: #ef4444;
-  --color-accent-yellow: #eab308;
-  --color-accent-purple: #7132f5;
-
-  /* Border */
-  --color-border: #dedee5;
-
-  /* Fonts */
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+  --color-accent-red: var(--accent-red);
+  --color-accent-yellow: var(--accent-yellow);
+  --color-accent-purple: var(--accent-purple);
+  --color-border: var(--border-color);
   --font-mono: 'IBM Plex Sans', system-ui, sans-serif;
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 html,
 body {
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  transition: background-color 0.2s, color 0.2s;
 }
 
 /* Status bar pulsing connection dot — 2s ease-in-out per spec */

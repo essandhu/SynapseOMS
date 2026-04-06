@@ -14,6 +14,7 @@ import { usePositionStore } from "../stores/positionStore";
 import { useRiskStore } from "../stores/riskStore";
 import { fetchPortfolioSummary } from "../api/rest";
 import type { PortfolioSummary } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ function VenueTooltip({
 // ── Main View ──────────────────────────────────────────────────────────
 
 export function PortfolioView() {
+  const theme = useThemeColors();
   const positions = usePositionStore((s) => s.positions);
   const posLoading = usePositionStore((s) => s.loading);
   const posError = usePositionStore((s) => s.error);
@@ -387,7 +389,7 @@ export function PortfolioView() {
                   <XAxis
                     type="number"
                     domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: "#9497a9", fontFamily: "'IBM Plex Sans', sans-serif" }}
+                    tick={{ fontSize: 10, fill: theme.colors.text.muted, fontFamily: theme.fonts.sans }}
                     tickFormatter={(v: number) => `${v}%`}
                     axisLine={false}
                     tickLine={false}
@@ -396,11 +398,11 @@ export function PortfolioView() {
                     type="category"
                     dataKey="venueId"
                     width={80}
-                    tick={{ fontSize: 10, fill: "#686b82", fontFamily: "'IBM Plex Sans', sans-serif" }}
+                    tick={{ fontSize: 10, fill: theme.colors.text.secondary, fontFamily: theme.fonts.sans }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={<VenueTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                  <Tooltip content={<VenueTooltip />} cursor={{ fill: theme.colors.bg.tertiary + "40" }} />
                   <Bar dataKey="percentage" radius={[0, 4, 4, 0]} barSize={18}>
                     {venueData.map((_, i) => (
                       <Cell

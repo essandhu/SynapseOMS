@@ -39,7 +39,7 @@ function ReportCard({ report }: { report: ExecutionReport }) {
   const gradeColor = gradeColors[report.overallGrade] ?? gradeColors["N/A"];
 
   return (
-    <div className="bg-[#f8f9fa] border border-[#dedee5] rounded-lg p-4">
+    <div className="bg-bg-secondary border border-border rounded-lg p-4">
       <div className="flex items-start gap-4">
         {/* Grade badge */}
         <div
@@ -52,21 +52,21 @@ function ReportCard({ report }: { report: ExecutionReport }) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <span className="text-sm text-[#686b82]">
+            <span className="text-sm text-text-secondary">
               Shortfall: {report.implementationShortfallBps.toFixed(1)} bps
             </span>
-            <span className="text-sm text-[#686b82]">
+            <span className="text-sm text-text-secondary">
               Impact: {report.marketImpactEstimateBps.toFixed(1)} bps
             </span>
           </div>
-          <p className="text-[#101114] text-sm">{report.summary}</p>
+          <p className="text-text-primary text-sm">{report.summary}</p>
         </div>
       </div>
 
       {/* Expandable detail */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="mt-3 text-sm text-[#7132f5] hover:text-[#5b1ecf] cursor-pointer"
+        className="mt-3 text-sm text-accent-blue hover:text-accent-blue/80 cursor-pointer"
       >
         {expanded ? "Hide details" : "Show venue analysis & recommendations"}
       </button>
@@ -75,13 +75,13 @@ function ReportCard({ report }: { report: ExecutionReport }) {
         <div className="mt-3 space-y-3">
           {report.venueAnalysis.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-[#101114] mb-2">
+              <h4 className="text-sm font-semibold text-text-primary mb-2">
                 Venue Analysis
               </h4>
               {report.venueAnalysis.map((va) => (
                 <div
                   key={va.venue}
-                  className="flex items-center gap-2 text-sm text-[#686b82] mb-1"
+                  className="flex items-center gap-2 text-sm text-text-secondary mb-1"
                 >
                   <span
                     className="inline-block w-6 h-6 rounded text-center text-xs font-bold leading-6 text-white"
@@ -92,7 +92,7 @@ function ReportCard({ report }: { report: ExecutionReport }) {
                   >
                     {va.grade}
                   </span>
-                  <span className="text-[#101114]">{va.venue}:</span>
+                  <span className="text-text-primary">{va.venue}:</span>
                   <span>{va.comment}</span>
                 </div>
               ))}
@@ -101,10 +101,10 @@ function ReportCard({ report }: { report: ExecutionReport }) {
 
           {report.recommendations.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-[#101114] mb-2">
+              <h4 className="text-sm font-semibold text-text-primary mb-2">
                 Recommendations
               </h4>
-              <ul className="list-disc list-inside text-sm text-[#686b82] space-y-1">
+              <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
                 {report.recommendations.map((rec, i) => (
                   <li key={i}>{rec}</li>
                 ))}

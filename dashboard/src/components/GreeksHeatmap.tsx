@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import * as d3 from "d3";
 import type { PortfolioGreeks } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const GREEK_KEYS = ["delta", "gamma", "vega", "theta", "rho"] as const;
 const GREEK_LABELS = ["Delta", "Gamma", "Vega", "Theta", "Rho"] as const;
@@ -28,6 +29,7 @@ function buildColorScale(maxAbs: number) {
 }
 
 export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
+  const theme = useThemeColors();
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
   const instruments = useMemo(() => {
@@ -105,7 +107,7 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
               y={headerH - 8}
               textAnchor="middle"
               className="fill-current text-text-muted"
-              style={{ fontSize: 11, fontFamily: "'IBM Plex Sans', sans-serif" }}
+              style={{ fontSize: 11, fontFamily: theme.fonts.sans }}
             >
               {label}
             </text>
@@ -124,7 +126,7 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
                   y={rowY + cellH / 2 + 4}
                   textAnchor="end"
                   className="fill-current text-text-muted"
-                  style={{ fontSize: 11, fontFamily: "'IBM Plex Sans', sans-serif" }}
+                  style={{ fontSize: 11, fontFamily: theme.fonts.sans }}
                 >
                   {inst}
                 </text>

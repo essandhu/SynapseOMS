@@ -1,3 +1,5 @@
+import { useThemeColors } from "../theme/terminal";
+
 interface VaRGaugeProps {
   title: string;
   amount: string | null;
@@ -52,6 +54,7 @@ export function VaRGauge({
   method,
   loading = false,
 }: VaRGaugeProps) {
+  const theme = useThemeColors();
   const isLoading = loading && amount === null;
   const color = colorForPercentage(navPercentage);
   const twColor = twColorForPercentage(navPercentage);
@@ -86,7 +89,7 @@ export function VaRGauge({
             <path
               d="M 6 64 A 54 54 0 0 1 114 64"
               fill="none"
-              stroke="#f0f1f3"
+              stroke={theme.colors.bg.tertiary}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
             />

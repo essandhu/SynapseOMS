@@ -26,10 +26,10 @@ export function InsightsPanel() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[#7132f5]">AI Insights</h2>
+      <h2 className="text-lg font-semibold text-accent-blue">AI Insights</h2>
 
       {/* Tab bar */}
-      <div className="flex border-b border-[#dedee5]" role="tablist">
+      <div className="flex border-b border-border" role="tablist">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -39,8 +39,8 @@ export function InsightsPanel() {
             className={[
               "relative px-4 py-2 text-sm font-medium transition-colors",
               activeTab === tab.id
-                ? "text-[#7132f5] border-b-2 border-[#7132f5]"
-                : "text-[#9497a9] hover:text-[#686b82]",
+                ? "text-accent-blue border-b-2 border-accent-blue"
+                : "text-text-muted hover:text-text-secondary",
             ].join(" ")}
           >
             {tab.label}

@@ -10,6 +10,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
+import { useThemeColors } from "../theme/terminal";
 
 const NUM_BINS = 50;
 const COLOR_NORMAL = "#7132f5";
@@ -95,6 +96,7 @@ export function MonteCarloPlot({
   varAmount,
   cvarAmount,
 }: MonteCarloPlotProps) {
+  const theme = useThemeColors();
   const bins = useMemo(() => {
     if (!distribution || distribution.length === 0) return null;
     return buildHistogram(distribution, NUM_BINS);
@@ -135,32 +137,32 @@ export function MonteCarloPlot({
           data={bins}
           margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f1f3" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.colors.bg.tertiary} vertical={false} />
           <XAxis
             dataKey="midpoint"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
-            axisLine={{ stroke: "#dedee5" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
             tickFormatter={formatPnL}
             label={{
               value: "P&L ($)",
               position: "insideBottomRight",
               offset: -4,
-              style: { fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" },
+              style: { fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans },
             }}
           />
           <YAxis
-            tick={{ fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" }}
-            axisLine={{ stroke: "#dedee5" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
             label={{
               value: "Frequency",
               angle: -90,
               position: "insideLeft",
               offset: 12,
-              style: { fill: "#9497a9", fontSize: 10, fontFamily: "'IBM Plex Sans', sans-serif" },
+              style: { fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans },
             }}
           />
           <Tooltip content={<HistogramTooltip />} />
@@ -176,7 +178,7 @@ export function MonteCarloPlot({
                 position: "top",
                 fill: COLOR_VAR_LINE,
                 fontSize: 10,
-                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontFamily: theme.fonts.sans,
               }}
             />
           )}
@@ -192,7 +194,7 @@ export function MonteCarloPlot({
                 position: "top",
                 fill: COLOR_CVAR_LINE,
                 fontSize: 10,
-                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontFamily: theme.fonts.sans,
               }}
             />
           )}

@@ -15,6 +15,7 @@ import { MonteCarloPlot } from "../components/MonteCarloPlot";
 import { GreeksHeatmap } from "../components/GreeksHeatmap";
 import { ConcentrationTreemap } from "../components/ConcentrationTreemap";
 import type { SettlementTimeline } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 function formatCurrency(amount: string): string {
   const num = parseFloat(amount);
@@ -65,6 +66,7 @@ function SettlementSection({
 }: {
   settlement: SettlementTimeline | null;
 }) {
+  const theme = useThemeColors();
   if (!settlement) {
     return (
       <div className="rounded border border-border bg-bg-secondary p-4">
@@ -109,17 +111,17 @@ function SettlementSection({
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#f0f1f3"
+                stroke={theme.colors.bg.tertiary}
                 horizontal={false}
               />
               <XAxis
                 type="number"
                 tick={{
-                  fill: "#9497a9",
+                  fill: theme.colors.text.muted,
                   fontSize: 10,
-                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontFamily: theme.fonts.sans,
                 }}
-                axisLine={{ stroke: "#dedee5" }}
+                axisLine={{ stroke: theme.colors.border }}
                 tickLine={false}
                 tickFormatter={(v: number) =>
                   `$${(v / 1000).toFixed(0)}k`
@@ -129,11 +131,11 @@ function SettlementSection({
                 type="category"
                 dataKey="date"
                 tick={{
-                  fill: "#9497a9",
+                  fill: theme.colors.text.muted,
                   fontSize: 10,
-                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontFamily: theme.fonts.sans,
                 }}
-                axisLine={{ stroke: "#dedee5" }}
+                axisLine={{ stroke: theme.colors.border }}
                 tickLine={false}
                 tickFormatter={formatDate}
                 width={64}
@@ -141,7 +143,7 @@ function SettlementSection({
               <Tooltip content={<SettlementBarTooltip />} />
               <Bar
                 dataKey="amount"
-                fill="#7132f5"
+                fill={theme.colors.accent.blue}
                 radius={[0, 4, 4, 0]}
                 isAnimationActive={false}
               />

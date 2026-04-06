@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import * as d3 from "d3";
 import type { ConcentrationResult, Position, AssetClass } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const ASSET_CLASS_COLORS: Record<AssetClass, string> = {
   equity: "#7132f5",
@@ -75,6 +76,7 @@ export function ConcentrationTreemap({
   width: propWidth,
   height: propHeight,
 }: ConcentrationTreemapProps) {
+  const theme = useThemeColors();
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [dimensions, setDimensions] = useState({
@@ -218,7 +220,7 @@ export function ConcentrationTreemap({
                     fill="#ffffff"
                     style={{
                       fontSize: Math.min(11, w / 8),
-                      fontFamily: "'IBM Plex Sans', sans-serif",
+                      fontFamily: theme.fonts.sans,
                       pointerEvents: "none",
                     }}
                   >
@@ -233,7 +235,7 @@ export function ConcentrationTreemap({
                     fill="#e5e7eb"
                     style={{
                       fontSize: 10,
-                      fontFamily: "'IBM Plex Sans', sans-serif",
+                      fontFamily: theme.fonts.sans,
                       pointerEvents: "none",
                     }}
                   >
@@ -257,7 +259,7 @@ export function ConcentrationTreemap({
                       style={{
                         fontSize: 10,
                         fontWeight: "bold",
-                        fontFamily: "'IBM Plex Sans', sans-serif",
+                        fontFamily: theme.fonts.sans,
                         pointerEvents: "none",
                       }}
                     >
