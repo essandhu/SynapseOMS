@@ -2,14 +2,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { OrderTable, buildColumnDefs } from "./OrderTable";
 import { makeOrder } from "../mocks/data";
+import { useThemeStore } from "../stores/themeStore";
 import type { ColDef } from "ag-grid-community";
 import type { Order } from "../api/types";
+
+/** Helper: find the ag-Grid wrapper regardless of current theme */
+function findGridWrapper(container: HTMLElement) {
+  return container.querySelector(
+    ".ag-theme-alpine-dark, .ag-theme-alpine:not(.ag-theme-alpine-dark)",
+  );
+}
 
 describe("OrderTable", () => {
   const onCancel = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset to default dark mode
+    useThemeStore.setState({ mode: "dark" });
   });
 
   // --- Rendering ---
@@ -18,7 +28,7 @@ describe("OrderTable", () => {
     const { container } = render(
       <OrderTable orders={[]} onCancel={onCancel} />,
     );
-    expect(container.querySelector(".ag-theme-alpine-dark")).toBeTruthy();
+    expect(findGridWrapper(container)).toBeTruthy();
   });
 
   it("renders with orders", () => {
@@ -29,7 +39,28 @@ describe("OrderTable", () => {
     const { container } = render(
       <OrderTable orders={orders} onCancel={onCancel} />,
     );
+    expect(findGridWrapper(container)).toBeTruthy();
+  });
+
+  // --- Theme-aware grid class ---
+
+  it("uses ag-theme-alpine-dark in dark mode", () => {
+    useThemeStore.setState({ mode: "dark" });
+    const { container } = render(
+      <OrderTable orders={[]} onCancel={onCancel} />,
+    );
     expect(container.querySelector(".ag-theme-alpine-dark")).toBeTruthy();
+  });
+
+  it("uses ag-theme-alpine in light mode", () => {
+    useThemeStore.setState({ mode: "light" });
+    const { container } = render(
+      <OrderTable orders={[]} onCancel={onCancel} />,
+    );
+    const wrapper = findGridWrapper(container) as HTMLElement;
+    expect(wrapper).toBeTruthy();
+    expect(wrapper.classList.contains("ag-theme-alpine")).toBe(true);
+    expect(wrapper.classList.contains("ag-theme-alpine-dark")).toBe(false);
   });
 
   // --- Layout: scrolling and sizing ---
@@ -38,9 +69,7 @@ describe("OrderTable", () => {
     const { container } = render(
       <OrderTable orders={[]} onCancel={onCancel} />,
     );
-    const gridWrapper = container.querySelector(
-      ".ag-theme-alpine-dark",
-    ) as HTMLElement;
+    const gridWrapper = findGridWrapper(container) as HTMLElement;
     expect(gridWrapper.style.height).toBe("100%");
     expect(gridWrapper.style.width).toBe("100%");
   });
