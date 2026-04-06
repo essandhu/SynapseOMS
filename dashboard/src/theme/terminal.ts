@@ -54,7 +54,15 @@ export const lightTheme = {
   },
 } as const;
 
-export type TerminalTheme = typeof darkTheme;
+export interface TerminalTheme {
+  readonly colors: {
+    readonly bg: { readonly primary: string; readonly secondary: string; readonly tertiary: string };
+    readonly text: { readonly primary: string; readonly secondary: string; readonly muted: string };
+    readonly accent: { readonly blue: string; readonly green: string; readonly red: string; readonly yellow: string; readonly purple: string };
+    readonly border: string;
+  };
+  readonly fonts: { readonly mono: string; readonly sans: string };
+}
 
 /** Returns the active theme colors based on current dark/light mode */
 export function useThemeColors(): TerminalTheme {
