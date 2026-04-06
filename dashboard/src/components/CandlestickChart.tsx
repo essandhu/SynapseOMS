@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { createChart, ColorType, CandlestickSeries } from "lightweight-charts";
 import type { IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts";
 import { useMarketDataStore } from "../stores/marketDataStore";
-import { terminalTheme } from "../theme/terminal";
+import { useThemeColors } from "../theme/terminal";
 
 interface CandlestickChartProps {
   instrumentId: string;
@@ -32,48 +32,49 @@ export function CandlestickChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const theme = useThemeColors();
   const key = `${instrumentId}:${interval}`;
   const barsFromStore = useMarketDataStore((s) => s.bars[key]);
   const bars = useMemo(() => barsFromStore ?? [], [barsFromStore]);
 
-  // Create chart on mount
+  // Create / recreate chart when theme changes
   useEffect(() => {
     if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: terminalTheme.colors.bg.primary },
-        textColor: terminalTheme.colors.text.muted,
-        fontFamily: terminalTheme.fonts.mono,
+        background: { type: ColorType.Solid, color: theme.colors.bg.primary },
+        textColor: theme.colors.text.muted,
+        fontFamily: theme.fonts.sans,
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: terminalTheme.colors.bg.tertiary },
-        horzLines: { color: terminalTheme.colors.bg.tertiary },
+        vertLines: { color: theme.colors.bg.tertiary },
+        horzLines: { color: theme.colors.bg.tertiary },
       },
       crosshair: {
-        vertLine: { color: terminalTheme.colors.border, width: 1 },
-        horzLine: { color: terminalTheme.colors.border, width: 1 },
+        vertLine: { color: theme.colors.border, width: 1 },
+        horzLine: { color: theme.colors.border, width: 1 },
       },
       timeScale: {
-        borderColor: terminalTheme.colors.border,
+        borderColor: theme.colors.border,
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: terminalTheme.colors.border,
+        borderColor: theme.colors.border,
       },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     });
 
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: terminalTheme.colors.accent.green,
-      downColor: terminalTheme.colors.accent.red,
-      borderUpColor: terminalTheme.colors.accent.green,
-      borderDownColor: terminalTheme.colors.accent.red,
-      wickUpColor: terminalTheme.colors.accent.green,
-      wickDownColor: terminalTheme.colors.accent.red,
+      upColor: theme.colors.accent.green,
+      downColor: theme.colors.accent.red,
+      borderUpColor: theme.colors.accent.green,
+      borderDownColor: theme.colors.accent.red,
+      wickUpColor: theme.colors.accent.green,
+      wickDownColor: theme.colors.accent.red,
     });
 
     chartRef.current = chart;
@@ -93,7 +94,7 @@ export function CandlestickChart({
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, []);
+  }, [theme]);
 
   // Update data when bars change
   useEffect(() => {
@@ -115,8 +116,8 @@ export function CandlestickChart({
       {!hasData && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className="font-mono text-xs animate-pulse"
-            style={{ color: terminalTheme.colors.text.muted }}
+            className="text-xs animate-pulse"
+            style={{ color: theme.colors.text.muted }}
           >
             Waiting for market data...
           </span>

@@ -15,6 +15,7 @@ import { MonteCarloPlot } from "../components/MonteCarloPlot";
 import { GreeksHeatmap } from "../components/GreeksHeatmap";
 import { ConcentrationTreemap } from "../components/ConcentrationTreemap";
 import type { SettlementTimeline } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 function formatCurrency(amount: string): string {
   const num = parseFloat(amount);
@@ -32,13 +33,11 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/** Derive NAV percentage from VaR amount (approximation using total unsettled as proxy) */
+/** Derive NAV percentage from VaR amount */
 function varNavPct(varAmount: string | null): number | null {
   if (!varAmount) return null;
   const num = parseFloat(varAmount);
   if (Number.isNaN(num)) return null;
-  // VaR amount is already a percentage-like value in the store;
-  // we display as-is and let the backend compute the actual NAV%
   return Math.abs(num);
 }
 
@@ -53,7 +52,7 @@ function SettlementBarTooltip({
 }) {
   if (!active || !payload?.length || !label) return null;
   return (
-    <div className="rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg">
+    <div className="rounded border border-border bg-bg-secondary px-3 py-2 text-xs" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
       <p className="text-text-muted">{formatDate(label)}</p>
       <p className="text-accent-blue font-medium">
         ${payload[0].value.toLocaleString()}
@@ -67,14 +66,15 @@ function SettlementSection({
 }: {
   settlement: SettlementTimeline | null;
 }) {
+  const theme = useThemeColors();
   if (!settlement) {
     return (
       <div className="rounded border border-border bg-bg-secondary p-4">
-        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Settlement Risk
         </h3>
         <div className="flex h-32 items-center justify-center">
-          <span className="animate-pulse font-mono text-xs text-text-muted">
+          <span className="animate-pulse text-xs text-text-muted">
             Loading...
           </span>
         </div>
@@ -92,10 +92,10 @@ function SettlementSection({
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Settlement Risk
         </h3>
-        <span className="font-mono text-sm font-bold text-accent-yellow">
+        <span className="text-sm font-bold text-accent-yellow">
           {formatCurrency(settlement.totalUnsettled)} unsettled
         </span>
       </div>
@@ -111,17 +111,17 @@ function SettlementSection({
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#1f2937"
+                stroke={theme.colors.bg.tertiary}
                 horizontal={false}
               />
               <XAxis
                 type="number"
                 tick={{
-                  fill: "#6b7280",
+                  fill: theme.colors.text.muted,
                   fontSize: 10,
-                  fontFamily: "monospace",
+                  fontFamily: theme.fonts.sans,
                 }}
-                axisLine={{ stroke: "#374151" }}
+                axisLine={{ stroke: theme.colors.border }}
                 tickLine={false}
                 tickFormatter={(v: number) =>
                   `$${(v / 1000).toFixed(0)}k`
@@ -131,11 +131,11 @@ function SettlementSection({
                 type="category"
                 dataKey="date"
                 tick={{
-                  fill: "#6b7280",
+                  fill: theme.colors.text.muted,
                   fontSize: 10,
-                  fontFamily: "monospace",
+                  fontFamily: theme.fonts.sans,
                 }}
-                axisLine={{ stroke: "#374151" }}
+                axisLine={{ stroke: theme.colors.border }}
                 tickLine={false}
                 tickFormatter={formatDate}
                 width={64}
@@ -143,7 +143,7 @@ function SettlementSection({
               <Tooltip content={<SettlementBarTooltip />} />
               <Bar
                 dataKey="amount"
-                fill="#3b82f6"
+                fill={theme.colors.accent.blue}
                 radius={[0, 4, 4, 0]}
                 isAnimationActive={false}
               />
@@ -153,7 +153,7 @@ function SettlementSection({
 
         {/* Table of pending settlements */}
         <div className="overflow-auto">
-          <table className="w-full font-mono text-xs">
+          <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border text-left text-text-muted">
                 <th className="pb-2 pr-4 font-medium">Date</th>
@@ -229,18 +229,18 @@ export function RiskDashboard() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Risk Dashboard
         </h2>
         {loading && (
-          <span className="animate-pulse font-mono text-xs text-text-muted">
+          <span className="animate-pulse text-xs text-text-muted">
             Refreshing...
           </span>
         )}
       </div>
 
       {error && (
-        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
+        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs text-accent-red">
           {error}
         </div>
       )}

@@ -1,16 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import * as d3 from "d3";
 import type { ConcentrationResult, Position, AssetClass } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const ASSET_CLASS_COLORS: Record<AssetClass, string> = {
-  equity: "#3b82f6",
+  equity: "#7132f5",
   crypto: "#f59e0b",
   tokenized_security: "#8b5cf6",
   future: "#10b981",
   option: "#ef4444",
 };
 
-const DEFAULT_COLOR = "#6b7280";
+const DEFAULT_COLOR = "#9497a9";
 const CONCENTRATION_THRESHOLD = 25;
 const DEFAULT_WIDTH = 500;
 const DEFAULT_HEIGHT = 300;
@@ -75,6 +76,7 @@ export function ConcentrationTreemap({
   width: propWidth,
   height: propHeight,
 }: ConcentrationTreemapProps) {
+  const theme = useThemeColors();
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [dimensions, setDimensions] = useState({
@@ -143,11 +145,11 @@ export function ConcentrationTreemap({
   ) {
     return (
       <div className="rounded border border-border border-dashed bg-bg-secondary p-4">
-        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Concentration Risk
         </h3>
         <div className="flex h-40 items-center justify-center">
-          <span className="font-mono text-xs text-text-muted">
+          <span className="text-xs text-text-muted">
             No concentration data available
           </span>
         </div>
@@ -158,10 +160,10 @@ export function ConcentrationTreemap({
   return (
     <div className="rounded border border-border bg-bg-secondary p-4 relative">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Concentration Risk
         </h3>
-        <span className="font-mono text-[10px] text-text-muted">
+        <span className="text-[10px] text-text-muted">
           HHI: {concentration.hhi.toLocaleString()}
         </span>
       </div>
@@ -215,10 +217,10 @@ export function ConcentrationTreemap({
                     x={x + w / 2}
                     y={y + (showPct ? h / 2 - 4 : h / 2 + 4)}
                     textAnchor="middle"
-                    fill="#f9fafb"
+                    fill="#ffffff"
                     style={{
                       fontSize: Math.min(11, w / 8),
-                      fontFamily: "monospace",
+                      fontFamily: theme.fonts.sans,
                       pointerEvents: "none",
                     }}
                   >
@@ -230,10 +232,10 @@ export function ConcentrationTreemap({
                     x={x + w / 2}
                     y={y + h / 2 + 10}
                     textAnchor="middle"
-                    fill="#d1d5db"
+                    fill="#e5e7eb"
                     style={{
                       fontSize: 10,
-                      fontFamily: "monospace",
+                      fontFamily: theme.fonts.sans,
                       pointerEvents: "none",
                     }}
                   >
@@ -257,7 +259,7 @@ export function ConcentrationTreemap({
                       style={{
                         fontSize: 10,
                         fontWeight: "bold",
-                        fontFamily: "monospace",
+                        fontFamily: theme.fonts.sans,
                         pointerEvents: "none",
                       }}
                     >
@@ -274,11 +276,12 @@ export function ConcentrationTreemap({
         {tooltip && (
           <div
             data-testid="treemap-tooltip"
-            className="pointer-events-none absolute z-50 rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg"
+            className="pointer-events-none absolute z-50 rounded border border-border bg-bg-secondary px-3 py-2 text-xs shadow-lg"
             style={{
               left: tooltip.x,
               top: tooltip.y - 8,
               transform: "translate(-50%, -100%)",
+              boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px",
             }}
           >
             <p className="text-text-primary font-medium">
@@ -305,7 +308,7 @@ export function ConcentrationTreemap({
                   ASSET_CLASS_COLORS[ac as AssetClass] ?? DEFAULT_COLOR,
               }}
             />
-            <span className="font-mono text-[10px] text-text-muted">
+            <span className="text-[10px] text-text-muted">
               {formatAssetClass(ac as AssetClass)} {pct.toFixed(0)}%
             </span>
           </div>

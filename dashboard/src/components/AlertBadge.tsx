@@ -3,7 +3,7 @@ import { useInsightStore } from "../stores/insightStore";
 const severityColors: Record<string, string> = {
   critical: "#ef4444",
   warning: "#eab308",
-  info: "#3b82f6",
+  info: "#7132f5",
 };
 
 export function AlertBadge() {
@@ -24,7 +24,7 @@ export function AlertBadge() {
 
   return (
     <span
-      className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold text-black"
+      className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold text-white"
       style={{ backgroundColor: bgColor }}
       data-testid="alert-badge"
     >

@@ -8,6 +8,7 @@ import { usePositionStore } from "../stores/positionStore";
 import { useMarketDataStore } from "../stores/marketDataStore";
 import { fetchInstruments } from "../api/rest";
 import type { Instrument, OrderStatus } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 type StatusFilter = "active" | "all" | "filled" | "canceled";
 
@@ -21,6 +22,7 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
 ];
 
 export function BlotterView() {
+  const theme = useThemeColors();
   const orders = useOrderStore((s) => s.orders);
   const loading = useOrderStore((s) => s.loading);
   const error = useOrderStore((s) => s.error);
@@ -101,12 +103,12 @@ export function BlotterView() {
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className="rounded px-3 py-1 font-mono text-xs font-medium transition-colors"
+                className="rounded-xl px-3 py-1 text-xs font-medium transition-colors"
                 style={{
                   backgroundColor:
-                    filter === tab.key ? "rgba(59,130,246,0.2)" : "transparent",
-                  color: filter === tab.key ? "#3b82f6" : "#6b7280",
-                  border: `1px solid ${filter === tab.key ? "rgba(59,130,246,0.3)" : "transparent"}`,
+                    filter === tab.key ? theme.colors.accent.blue + "29" : "transparent",
+                  color: filter === tab.key ? theme.colors.accent.blue : theme.colors.text.muted,
+                  border: `1px solid ${filter === tab.key ? theme.colors.accent.blue + "4D" : "transparent"}`,
                 }}
               >
                 {tab.label}
@@ -116,18 +118,18 @@ export function BlotterView() {
 
           <div className="flex items-center gap-3">
             {loading && (
-              <span className="font-mono text-xs text-text-muted">Loading...</span>
+              <span className="text-xs text-text-muted">Loading...</span>
             )}
             <button
               onClick={() => setChartOpen((v) => !v)}
-              className="rounded border border-border px-2 py-1 font-mono text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
+              className="rounded-xl border border-border px-2 py-1 text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
               data-testid="chart-toggle"
             >
               {chartOpen ? "Hide Chart" : "Chart"}
             </button>
             <button
               onClick={() => setTicketOpen((v) => !v)}
-              className="rounded border border-border px-2 py-1 font-mono text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
+              className="rounded-xl border border-border px-2 py-1 text-xs text-text-muted transition-colors hover:border-accent-blue hover:text-accent-blue"
             >
               {ticketOpen ? "Hide Ticket" : "New Order"}
             </button>
@@ -136,7 +138,7 @@ export function BlotterView() {
 
         {/* Error banner */}
         {error && (
-          <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
+          <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs text-accent-red">
             {error}
           </div>
         )}
@@ -149,11 +151,11 @@ export function BlotterView() {
             data-testid="chart-panel"
           >
             <div className="flex items-center gap-2 border-b border-border px-3 py-1">
-              <span className="font-mono text-xs text-text-muted">Chart:</span>
+              <span className="text-xs text-text-muted">Chart:</span>
               <select
                 value={chartInstrument}
                 onChange={(e) => setChartInstrument(e.target.value)}
-                className="rounded border border-border bg-bg-secondary px-2 py-0.5 font-mono text-xs text-text-primary"
+                className="rounded border border-border bg-bg-secondary px-2 py-0.5 text-xs text-text-primary"
               >
                 {instruments.length > 0 ? (
                   instruments.map((inst) => (
@@ -170,11 +172,11 @@ export function BlotterView() {
                   key={iv}
                   onClick={() => setChartInterval(iv)}
                   data-testid={`interval-${iv}`}
-                  className="rounded px-2 py-0.5 font-mono text-xs font-medium transition-colors"
+                  className="rounded-xl px-2 py-0.5 text-xs font-medium transition-colors"
                   style={{
-                    backgroundColor: chartInterval === iv ? "rgba(59,130,246,0.2)" : "transparent",
-                    color: chartInterval === iv ? "#3b82f6" : "#6b7280",
-                    border: `1px solid ${chartInterval === iv ? "rgba(59,130,246,0.3)" : "transparent"}`,
+                    backgroundColor: chartInterval === iv ? theme.colors.accent.blue + "29" : "transparent",
+                    color: chartInterval === iv ? theme.colors.accent.blue : theme.colors.text.muted,
+                    border: `1px solid ${chartInterval === iv ? theme.colors.accent.blue + "4D" : "transparent"}`,
                   }}
                 >
                   {iv}

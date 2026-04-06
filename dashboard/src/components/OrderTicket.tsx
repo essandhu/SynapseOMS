@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import type { AssetClass, Instrument, OrderSide, OrderType, Position, SubmitOrderRequest, Venue } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const SMART_ROUTE_ID = "smart";
 
@@ -23,6 +24,7 @@ function netPositionForInstrument(positions: Position[], instrumentId: string): 
 }
 
 export function OrderTicket({ instruments, venues = [], positions = [], onSubmit }: OrderTicketProps) {
+  const theme = useThemeColors();
   const [instrumentId, setInstrumentId] = useState("");
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("market");
@@ -145,7 +147,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
       className="flex flex-col gap-3 rounded border border-border bg-bg-secondary p-4"
       style={{ maxWidth: 360 }}
     >
-      <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
         Order Ticket
       </h2>
 
@@ -153,7 +155,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
       <div className="flex flex-col gap-1">
         <label
           htmlFor="instrument-select"
-          className="font-mono text-xs text-text-muted"
+          className="text-xs text-text-muted"
         >
           Instrument
         </label>
@@ -164,13 +166,13 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
           placeholder="Search instruments..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+          className="rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
         />
         <select
           id="instrument-select"
           value={instrumentId}
           onChange={(e) => setInstrumentId(e.target.value)}
-          className="rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary focus:border-accent-blue focus:outline-none"
+          className="rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary focus:border-accent-blue focus:outline-none"
         >
           <option value="">Select instrument</option>
           {filteredInstruments.map((inst) => (
@@ -185,7 +187,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
       <div className="flex flex-col gap-1">
         <label
           htmlFor="venue-select"
-          className="font-mono text-xs text-text-muted"
+          className="text-xs text-text-muted"
         >
           Venue
         </label>
@@ -195,7 +197,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
             aria-label="Venue"
             value={effectiveVenueId}
             onChange={(e) => setVenueId(e.target.value)}
-            className="w-full rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary focus:border-accent-blue focus:outline-none"
+            className="w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary focus:border-accent-blue focus:outline-none"
           >
             <option value={SMART_ROUTE_ID}>⚡ Smart Route</option>
             {availableVenues.map((v) => (
@@ -205,7 +207,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
             ))}
           </select>
           {!hasConnectedVenues && (
-            <p className="mt-1 font-mono text-xs text-accent-yellow">
+            <p className="mt-1 text-xs text-accent-yellow">
               No connected venues{selectedInstrument?.assetClass ? ` for ${selectedInstrument.assetClass}` : ""}
             </p>
           )}
@@ -214,7 +216,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
               <button
                 type="button"
                 aria-label="Smart Route info"
-                className="font-mono text-xs text-accent-blue underline decoration-dotted"
+                className="text-xs text-accent-blue underline decoration-dotted"
                 onMouseEnter={() => setShowSmartRouteTooltip(true)}
                 onMouseLeave={() => setShowSmartRouteTooltip(false)}
                 onFocus={() => setShowSmartRouteTooltip(true)}
@@ -225,7 +227,8 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
               {showSmartRouteTooltip && (
                 <div
                   role="tooltip"
-                  className="absolute left-0 top-full z-10 mt-1 w-full rounded border border-border bg-bg-primary px-2 py-1.5 font-mono text-xs text-text-muted shadow-lg"
+                  className="absolute left-0 top-full z-10 mt-1 w-full rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-muted"
+                  style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}
                 >
                   Order will be automatically routed to the best venue(s) based
                   on price, depth, and execution quality
@@ -238,16 +241,16 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
 
       {/* Side toggle */}
       <div className="flex flex-col gap-1">
-        <span className="font-mono text-xs text-text-muted">Side</span>
+        <span className="text-xs text-text-muted">Side</span>
         <div className="flex gap-1">
           <button
             type="button"
             onClick={() => setSide("buy")}
-            className="flex-1 rounded px-3 py-1.5 font-mono text-xs font-bold transition-colors"
+            className="flex-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors"
             style={{
-              backgroundColor: side === "buy" ? "#22c55e" : undefined,
-              color: side === "buy" ? "#0a0e17" : "#22c55e",
-              border: `1px solid #22c55e`,
+              backgroundColor: side === "buy" ? theme.colors.accent.green : undefined,
+              color: side === "buy" ? "#fff" : theme.colors.accent.green,
+              border: `1px solid ${theme.colors.accent.green}`,
             }}
           >
             Buy
@@ -255,11 +258,11 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
           <button
             type="button"
             onClick={() => setSide("sell")}
-            className="flex-1 rounded px-3 py-1.5 font-mono text-xs font-bold transition-colors"
+            className="flex-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors"
             style={{
-              backgroundColor: side === "sell" ? "#ef4444" : undefined,
-              color: side === "sell" ? "#0a0e17" : "#ef4444",
-              border: `1px solid #ef4444`,
+              backgroundColor: side === "sell" ? theme.colors.accent.red : undefined,
+              color: side === "sell" ? "#fff" : theme.colors.accent.red,
+              border: `1px solid ${theme.colors.accent.red}`,
             }}
           >
             Sell
@@ -269,26 +272,26 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
 
       {/* Sell-side position info */}
       {side === "sell" && instrumentId && (
-        <div className="rounded border border-border/50 bg-bg-primary/50 px-2 py-1 font-mono text-xs text-text-muted">
+        <div className="rounded border border-border/50 bg-bg-primary/50 px-2 py-1 text-xs text-text-muted">
           Held: {netPositionForInstrument(positions, instrumentId)} shares
         </div>
       )}
 
       {/* Order type selector */}
       <div className="flex flex-col gap-1">
-        <span className="font-mono text-xs text-text-muted">Order Type</span>
+        <span className="text-xs text-text-muted">Order Type</span>
         <div className="flex gap-1">
           {(["market", "limit"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setOrderType(t)}
-              className="flex-1 rounded px-3 py-1.5 font-mono text-xs font-medium transition-colors"
+              className="flex-1 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
                 backgroundColor:
-                  orderType === t ? "#3b82f6" : "transparent",
-                color: orderType === t ? "#0a0e17" : "#9ca3af",
-                border: `1px solid ${orderType === t ? "#3b82f6" : "#374151"}`,
+                  orderType === t ? theme.colors.accent.blue : "transparent",
+                color: orderType === t ? "#fff" : theme.colors.text.muted,
+                border: `1px solid ${orderType === t ? theme.colors.accent.blue : theme.colors.border}`,
               }}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -301,7 +304,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
       <div className="flex flex-col gap-1">
         <label
           htmlFor="order-quantity"
-          className="font-mono text-xs text-text-muted"
+          className="text-xs text-text-muted"
         >
           Quantity
         </label>
@@ -314,7 +317,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
           placeholder="0"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          className="rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+          className="rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
         />
       </div>
 
@@ -323,7 +326,7 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
         <div className="flex flex-col gap-1">
           <label
             htmlFor="order-price"
-            className="font-mono text-xs text-text-muted"
+            className="text-xs text-text-muted"
           >
             Price
           </label>
@@ -336,14 +339,14 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
             placeholder="0.00"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
+            className="rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent-blue focus:outline-none"
           />
         </div>
       )}
 
       {/* Error display */}
       {error && (
-        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-2 py-1 font-mono text-xs text-accent-red">
+        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-2 py-1 text-xs text-accent-red">
           {error}
         </div>
       )}
@@ -352,10 +355,10 @@ export function OrderTicket({ instruments, venues = [], positions = [], onSubmit
       <button
         type="submit"
         disabled={submitting}
-        className="rounded px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+        className="rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
         style={{
-          backgroundColor: side === "buy" ? "#22c55e" : "#ef4444",
-          color: "#0a0e17",
+          backgroundColor: side === "buy" ? theme.colors.accent.green : theme.colors.accent.red,
+          color: "#fff",
         }}
       >
         {submitting ? "Submitting..." : "Submit Order"}

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import * as d3 from "d3";
 import type { PortfolioGreeks } from "../api/types";
+import { useThemeColors } from "../theme/terminal";
 
 const GREEK_KEYS = ["delta", "gamma", "vega", "theta", "rho"] as const;
 const GREEK_LABELS = ["Delta", "Gamma", "Vega", "Theta", "Rho"] as const;
@@ -28,6 +29,7 @@ function buildColorScale(maxAbs: number) {
 }
 
 export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
+  const theme = useThemeColors();
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
   const instruments = useMemo(() => {
@@ -52,11 +54,11 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
   if (!greeks || instruments.length === 0) {
     return (
       <div className="rounded border border-border border-dashed bg-bg-secondary p-4">
-        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Greeks Heatmap
         </h3>
         <div className="flex h-40 items-center justify-center">
-          <span className="font-mono text-xs text-text-muted">
+          <span className="text-xs text-text-muted">
             No Greeks data available
           </span>
         </div>
@@ -77,10 +79,10 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
   return (
     <div className="rounded border border-border bg-bg-secondary p-4 relative">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Greeks Heatmap
         </h3>
-        <span className="font-mono text-[10px] text-text-muted">
+        <span className="text-[10px] text-text-muted">
           {new Date(greeks.computedAt).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
@@ -105,7 +107,7 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
               y={headerH - 8}
               textAnchor="middle"
               className="fill-current text-text-muted"
-              style={{ fontSize: 11, fontFamily: "monospace" }}
+              style={{ fontSize: 11, fontFamily: theme.fonts.sans }}
             >
               {label}
             </text>
@@ -124,7 +126,7 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
                   y={rowY + cellH / 2 + 4}
                   textAnchor="end"
                   className="fill-current text-text-muted"
-                  style={{ fontSize: 11, fontFamily: "monospace" }}
+                  style={{ fontSize: 11, fontFamily: theme.fonts.sans }}
                 >
                   {inst}
                 </text>
@@ -171,11 +173,12 @@ export function GreeksHeatmap({ greeks }: GreeksHeatmapProps) {
       {tooltip && (
         <div
           data-testid="heatmap-tooltip"
-          className="pointer-events-none absolute z-50 rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg"
+          className="pointer-events-none absolute z-50 rounded border border-border bg-bg-secondary px-3 py-2 text-xs"
           style={{
             left: tooltip.x,
             top: tooltip.y - 8,
             transform: "translate(-50%, -100%)",
+            boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px",
           }}
         >
           <p className="text-text-muted">{tooltip.instrument}</p>

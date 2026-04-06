@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { useThemeColors } from "../theme/terminal";
 
 interface DrawdownChartProps {
   data: { date: string; drawdown: number }[];
@@ -30,7 +31,7 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length || !label) return null;
   return (
-    <div className="rounded border border-border bg-bg-secondary px-3 py-2 font-mono text-xs shadow-lg">
+    <div className="rounded border border-border bg-bg-secondary px-3 py-2 text-xs" style={{ boxShadow: "rgba(0,0,0,0.03) 0px 4px 24px" }}>
       <p className="text-text-muted">{formatDate(label)}</p>
       <p className="text-accent-red font-medium">
         {payload[0].value.toFixed(2)}%
@@ -40,14 +41,15 @@ function CustomTooltip({
 }
 
 export function DrawdownChart({ data, currentDrawdown }: DrawdownChartProps) {
+  const theme = useThemeColors();
   if (!data.length) {
     return (
       <div className="rounded border border-border bg-bg-secondary p-4">
-        <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Drawdown from Peak
         </h3>
         <div className="flex h-48 items-center justify-center">
-          <span className="font-mono text-xs text-text-muted">
+          <span className="text-xs text-text-muted">
             No drawdown data available
           </span>
         </div>
@@ -58,11 +60,11 @@ export function DrawdownChart({ data, currentDrawdown }: DrawdownChartProps) {
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Drawdown from Peak
         </h3>
         <span
-          className={`font-mono text-sm font-bold ${
+          className={`text-sm font-bold ${
             currentDrawdown < -5
               ? "text-accent-red"
               : currentDrawdown < -2
@@ -81,35 +83,35 @@ export function DrawdownChart({ data, currentDrawdown }: DrawdownChartProps) {
         >
           <defs>
             <linearGradient id="drawdownFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.1} />
+              <stop offset="0%" stopColor="#7132f5" stopOpacity={0.1} />
               <stop offset="100%" stopColor="#ef4444" stopOpacity={0.4} />
             </linearGradient>
           </defs>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="#1f2937"
+            stroke={theme.colors.bg.tertiary}
             vertical={false}
           />
           <XAxis
             dataKey="date"
             tickFormatter={formatDate}
-            tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-            axisLine={{ stroke: "#374151" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-            axisLine={{ stroke: "#374151" }}
+            tick={{ fill: theme.colors.text.muted, fontSize: 10, fontFamily: theme.fonts.sans }}
+            axisLine={{ stroke: theme.colors.border }}
             tickLine={false}
             tickFormatter={(v: number) => `${v}%`}
             domain={["dataMin - 1", 0]}
           />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={0} stroke="#374151" strokeWidth={1} />
+          <ReferenceLine y={0} stroke={theme.colors.border} strokeWidth={1} />
           <Area
             type="monotone"
             dataKey="drawdown"
-            stroke="#3b82f6"
+            stroke="#7132f5"
             strokeWidth={2}
             fill="url(#drawdownFill)"
             isAnimationActive={false}

@@ -50,7 +50,7 @@ export function PositionTable({ positions, totalNav }: PositionTableProps) {
     : BASE_COLUMNS;
   if (positions.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 font-mono text-xs text-text-muted">
+      <div className="flex items-center justify-center py-12 text-xs text-text-muted">
         No positions
       </div>
     );
@@ -58,7 +58,7 @@ export function PositionTable({ positions, totalNav }: PositionTableProps) {
 
   return (
     <div className="overflow-auto">
-      <table className="w-full border-collapse font-mono text-xs">
+      <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="border-b border-border">
             {columns.map((col) => (

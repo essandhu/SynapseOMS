@@ -1,3 +1,5 @@
+import { useThemeColors } from "../theme/terminal";
+
 interface VaRGaugeProps {
   title: string;
   amount: string | null;
@@ -9,8 +11,8 @@ interface VaRGaugeProps {
 }
 
 function colorForPercentage(pct: number | null): string {
-  if (pct === null) return "#6b7280"; // muted
-  if (pct < 2) return "#22c55e"; // green
+  if (pct === null) return "#9497a9"; // muted
+  if (pct < 2) return "#149e61"; // green
   if (pct <= 5) return "#eab308"; // yellow
   return "#ef4444"; // red
 }
@@ -52,6 +54,7 @@ export function VaRGauge({
   method,
   loading = false,
 }: VaRGaugeProps) {
+  const theme = useThemeColors();
   const isLoading = loading && amount === null;
   const color = colorForPercentage(navPercentage);
   const twColor = twColorForPercentage(navPercentage);
@@ -66,15 +69,15 @@ export function VaRGauge({
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
       <div className="mb-1 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           {title}
         </h3>
-        <span className="font-mono text-[10px] text-text-muted">{method}</span>
+        <span className="text-[10px] text-text-muted">{method}</span>
       </div>
 
       {isLoading ? (
         <div className="flex h-32 items-center justify-center">
-          <span className="font-mono text-xs text-text-muted animate-pulse">
+          <span className="text-xs text-text-muted animate-pulse">
             Loading...
           </span>
         </div>
@@ -86,7 +89,7 @@ export function VaRGauge({
             <path
               d="M 6 64 A 54 54 0 0 1 114 64"
               fill="none"
-              stroke="#1f2937"
+              stroke={theme.colors.bg.tertiary}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
             />
@@ -104,21 +107,21 @@ export function VaRGauge({
           </svg>
 
           {/* Large value */}
-          <span className={`-mt-2 font-mono text-2xl font-bold ${twColor}`}>
+          <span className={`-mt-2 text-2xl font-bold ${twColor}`}>
             {amount !== null ? formatCurrency(amount) : "—"}
           </span>
 
           {/* NAV percentage */}
-          <span className={`mt-1 font-mono text-sm font-medium ${twColor}`}>
+          <span className={`mt-1 text-sm font-medium ${twColor}`}>
             {navPercentage !== null ? `${navPercentage.toFixed(2)}% NAV` : "—"}
           </span>
 
           {/* Footer info */}
           <div className="mt-3 flex w-full items-center justify-between text-text-muted">
-            <span className="font-mono text-[10px]">
+            <span className="text-[10px]">
               {confidence}% confidence
             </span>
-            <span className="font-mono text-[10px]">
+            <span className="text-[10px]">
               {lastComputed ? formatTime(lastComputed) : "—"}
             </span>
           </div>

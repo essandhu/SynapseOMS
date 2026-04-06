@@ -49,7 +49,7 @@ describe("ExecutionAnalysisTab", () => {
     } as any);
     render(<ExecutionAnalysisTab />);
     const badge = screen.getByTestId("grade-badge");
-    expect(badge.style.backgroundColor).toBe("rgb(59, 130, 246)"); // blue #3b82f6
+    expect(badge.style.backgroundColor).toBe("rgb(113, 50, 245)"); // purple #7132f5
   });
 
   it("expands to show venue analysis", () => {

@@ -99,7 +99,7 @@ function ConstraintForm() {
 
   return (
     <div className="flex flex-col gap-4 rounded border border-border bg-bg-secondary p-4">
-      <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
         Constraints
       </h3>
 
@@ -107,7 +107,7 @@ function ConstraintForm() {
       <div className="flex flex-col gap-1">
         <label
           htmlFor="risk-aversion"
-          className="font-mono text-xs text-text-muted"
+          className="text-xs text-text-muted"
         >
           Risk Aversion: {constraints.riskAversion}
         </label>
@@ -126,7 +126,7 @@ function ConstraintForm() {
           }
           className="w-full accent-accent-blue"
         />
-        <div className="flex justify-between font-mono text-[10px] text-text-muted">
+        <div className="flex justify-between text-[10px] text-text-muted">
           <span>0.1 (growth)</span>
           <span>20 (min variance)</span>
         </div>
@@ -141,7 +141,7 @@ function ConstraintForm() {
           onChange={(e) => setConstraint("longOnly", e.target.checked)}
           className="h-4 w-4 rounded border-border accent-accent-blue"
         />
-        <label htmlFor="long-only" className="font-mono text-xs text-text-muted">
+        <label htmlFor="long-only" className="text-xs text-text-muted">
           Long Only
         </label>
       </div>
@@ -164,7 +164,7 @@ function ConstraintForm() {
           />
           <label
             htmlFor="max-single-weight"
-            className="font-mono text-xs text-text-muted"
+            className="text-xs text-text-muted"
           >
             Max Single Weight
           </label>
@@ -182,9 +182,9 @@ function ConstraintForm() {
                   parseFloat(e.target.value) || null,
                 )
               }
-              className="w-20 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
+              className="w-20 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary"
             />
-            <span className="font-mono text-xs text-text-muted">%</span>
+            <span className="text-xs text-text-muted">%</span>
           </div>
         )}
       </div>
@@ -204,7 +204,7 @@ function ConstraintForm() {
           />
           <label
             htmlFor="max-turnover"
-            className="font-mono text-xs text-text-muted"
+            className="text-xs text-text-muted"
           >
             Max Turnover
           </label>
@@ -222,9 +222,9 @@ function ConstraintForm() {
                   parseFloat(e.target.value) || null,
                 )
               }
-              className="w-20 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
+              className="w-20 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary"
             />
-            <span className="font-mono text-xs text-text-muted">%</span>
+            <span className="text-xs text-text-muted">%</span>
           </div>
         )}
       </div>
@@ -232,14 +232,14 @@ function ConstraintForm() {
       {/* Asset Class Bounds */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+          <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
             Asset Class Bounds
           </span>
           <button
             type="button"
             onClick={addBoundRow}
             disabled={boundRows.length >= ASSET_CLASSES.length}
-            className="rounded border border-border bg-bg-primary px-2 py-0.5 font-mono text-xs text-accent-blue hover:bg-bg-secondary disabled:opacity-40"
+            className="rounded border border-border bg-bg-primary px-2 py-0.5 text-xs text-accent-blue hover:bg-bg-secondary disabled:opacity-40"
           >
             + Add
           </button>
@@ -249,7 +249,7 @@ function ConstraintForm() {
             <select
               value={row.assetClass}
               onChange={(e) => updateBoundRow(i, "assetClass", e.target.value)}
-              className="rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
+              className="rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary"
             >
               {ASSET_CLASSES.map((ac) => (
                 <option key={ac} value={ac}>
@@ -263,24 +263,24 @@ function ConstraintForm() {
               max="100"
               value={row.min}
               onChange={(e) => updateBoundRow(i, "min", e.target.value)}
-              className="w-16 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
+              className="w-16 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary"
               placeholder="Min %"
             />
-            <span className="font-mono text-xs text-text-muted">-</span>
+            <span className="text-xs text-text-muted">-</span>
             <input
               type="number"
               min="0"
               max="100"
               value={row.max}
               onChange={(e) => updateBoundRow(i, "max", e.target.value)}
-              className="w-16 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-text-primary"
+              className="w-16 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-text-primary"
               placeholder="Max %"
             />
-            <span className="font-mono text-xs text-text-muted">%</span>
+            <span className="text-xs text-text-muted">%</span>
             <button
               type="button"
               onClick={() => removeBoundRow(i)}
-              className="font-mono text-xs text-accent-red hover:text-accent-red/80"
+              className="text-xs text-accent-red hover:text-accent-red/80"
             >
               Remove
             </button>
@@ -293,7 +293,7 @@ function ConstraintForm() {
         type="button"
         onClick={runOptimize}
         disabled={isOptimizing}
-        className="mt-2 rounded bg-accent-blue px-4 py-2 font-mono text-sm font-semibold text-white hover:bg-accent-blue/80 disabled:opacity-50"
+        className="mt-2 rounded-xl bg-accent-blue px-4 py-2 text-sm font-semibold text-white hover:bg-accent-blue/80 disabled:opacity-50"
       >
         {isOptimizing ? "Optimizing..." : "Optimize"}
       </button>
@@ -312,10 +312,10 @@ function MetricCard({
 }) {
   return (
     <div className="flex flex-col rounded border border-border bg-bg-secondary p-3">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+      <span className="text-[10px] uppercase tracking-wider text-text-muted">
         {label}
       </span>
-      <span className="font-mono text-lg font-bold text-text-primary">
+      <span className="text-lg font-bold text-text-primary">
         {value}
       </span>
     </div>
@@ -333,10 +333,10 @@ function AllocationTable({
 
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
-      <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
         Target Allocation
       </h3>
-      <table className="w-full font-mono text-xs">
+      <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border text-left text-text-muted">
             <th className="pb-2 pr-4 font-medium">Instrument</th>
@@ -372,14 +372,14 @@ function TradeListTable({
   return (
     <div className="rounded border border-border bg-bg-secondary p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
           Trade List
         </h3>
         <button
           type="button"
           onClick={onExecuteAll}
           disabled={isExecuting || trades.length === 0}
-          className="rounded bg-accent-green px-3 py-1 font-mono text-xs font-semibold text-white hover:bg-accent-green/80 disabled:opacity-50"
+          className="rounded-xl bg-accent-green px-3 py-1 text-xs font-semibold text-white hover:bg-accent-green/80 disabled:opacity-50"
         >
           {isExecuting
             ? `Submitting ${executionProgress?.submitted ?? 0}/${executionProgress?.total ?? trades.length}`
@@ -389,12 +389,12 @@ function TradeListTable({
 
       {executionProgress &&
         executionProgress.submitted === executionProgress.total && (
-          <div className="mb-3 rounded border border-accent-green/30 bg-accent-green/10 px-3 py-2 font-mono text-xs text-accent-green">
+          <div className="mb-3 rounded border border-accent-green/30 bg-accent-green/10 px-3 py-2 text-xs text-accent-green">
             All {executionProgress.total} orders submitted successfully.
           </div>
         )}
 
-      <table className="w-full font-mono text-xs">
+      <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border text-left text-text-muted">
             <th className="pb-2 pr-4 font-medium">Instrument</th>
@@ -500,12 +500,12 @@ export function OptimizerView() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
         Portfolio Optimizer
       </h2>
 
       {error && (
-        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 font-mono text-xs text-accent-red">
+        <div className="rounded border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs text-accent-red">
           {error}
         </div>
       )}
@@ -519,7 +519,7 @@ export function OptimizerView() {
           <ResultsPanel result={result} />
         ) : (
           <div className="flex items-center justify-center rounded border border-border bg-bg-secondary p-8">
-            <p className="font-mono text-xs text-text-muted">
+            <p className="text-xs text-text-muted">
               Configure constraints and click Optimize to see results.
             </p>
           </div>

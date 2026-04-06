@@ -52,7 +52,7 @@ function AppRoutes() {
       <div className="flex h-screen items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-3">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent-blue border-t-transparent" />
-          <span className="font-mono text-xs text-text-muted">Initializing...</span>
+          <span className="text-xs text-text-muted">Initializing...</span>
         </div>
       </div>
     );
