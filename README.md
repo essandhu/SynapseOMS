@@ -2,10 +2,7 @@
 
 **The open-source trading terminal for traders who work across equities and crypto.**
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/blotter-dark.png">
-  <img alt="SynapseOMS order blotter — filled equity and crypto orders alongside the order ticket" src="docs/media/blotter-light.png" width="100%">
-</picture>
+![Submitting a market order that routes to the simulated exchange and fills instantly](docs/media/order-flow.gif)
 
 There's no affordable tool that lets you see unified risk, execute across both traditional and crypto markets, and get AI-driven analysis from a single interface. Bloomberg costs $24k/year. Retail tools ignore half your portfolio. SynapseOMS fills the gap — and your keys, data, and strategies never leave your machine.
 
@@ -28,7 +25,10 @@ docker compose -f deploy/docker-compose.yml up
 
 Open [http://localhost:3000](http://localhost:3000). The onboarding flow will guide you through connecting the built-in simulated exchange — no external API keys needed.
 
-![Submitting a market order that routes to the simulated exchange and fills instantly](docs/media/order-flow.gif)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/blotter-dark.png">
+  <img alt="SynapseOMS order blotter — filled equity and crypto orders alongside the order ticket" src="docs/media/blotter-light.png" width="100%">
+</picture>
 
 For the full step-by-step guide, see [docs/quickstart.md](docs/quickstart.md).
 
