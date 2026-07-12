@@ -160,6 +160,10 @@ class TestHydrateSettlements:
     async def test_hydrates_equity_fills_as_pending(self) -> None:
         """T+2 equity fills are loaded as pending settlements."""
         tracker = SettlementTracker()
+        # Trade date must be today: hydrate_settlements() calls
+        # settle_matured() after loading, so a hardcoded past date would be
+        # marked completed as soon as the calendar passes its T+2 date.
+        fill_time = datetime.now(timezone.utc)
         rows = [
             {
                 "instrument_id": "AAPL",
@@ -167,7 +171,7 @@ class TestHydrateSettlements:
                 "side": "buy",
                 "quantity": Decimal("50"),
                 "price": Decimal("185"),
-                "timestamp": datetime(2026, 4, 4, 18, 0, 0, tzinfo=timezone.utc),
+                "timestamp": fill_time,
             },
             {
                 "instrument_id": "MSFT",
@@ -175,7 +179,7 @@ class TestHydrateSettlements:
                 "side": "buy",
                 "quantity": Decimal("30"),
                 "price": Decimal("420"),
-                "timestamp": datetime(2026, 4, 4, 18, 0, 0, tzinfo=timezone.utc),
+                "timestamp": fill_time,
             },
         ]
 
